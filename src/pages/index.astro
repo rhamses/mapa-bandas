@@ -9,7 +9,9 @@ import { getBandas } from '../lib/bandas';
 import { site } from '../lib/site';
 
 const bandas = await getBandas();
-const recentes = bandas.slice(0, 8);
+const recentes = bandas.slice(0, 12);
+const primeiraMetade = recentes.slice(0, 6);
+const segundaMetade = recentes.slice(6, 12);
 const jsonLd = {
 	'@context': 'https://schema.org',
 	'@type': 'CollectionPage',
@@ -47,7 +49,7 @@ const jsonLd = {
 		</div>
 	</section>
 
-	<section class="mx-auto max-w-6xl px-4 py-16 md:px-6">
+	<section class="mx-auto max-w-6xl px-4 pt-16 md:px-6">
 		<div class="mb-8 flex items-end justify-between gap-4">
 			<div>
 				<p class="text-xs uppercase tracking-[0.22em] text-ochre">últimas entradas</p>
@@ -59,11 +61,11 @@ const jsonLd = {
 			</a>
 		</div>
 		<div id="resultados" class="grid gap-5 md:grid-cols-2">
-			{recentes.map((banda) => <BandCard banda={banda} />)}
+			{primeiraMetade.map((banda) => <BandCard banda={banda} />)}
 		</div>
 	</section>
 
-	<section class="border-y border-ink/10 bg-forest py-16 text-paper">
+	<section class="mt-16 border-y border-ink/10 bg-forest py-16 text-paper">
 		<div class="mx-auto flex max-w-6xl flex-col items-start gap-6 px-4 md:flex-row md:items-center md:justify-between md:px-6">
 			<div>
 				<p class="text-xs uppercase tracking-[0.22em] text-gold">mapa</p>
@@ -78,4 +80,20 @@ const jsonLd = {
 			</a>
 		</div>
 	</section>
+
+	{
+		segundaMetade.length > 0 && (
+			<section class="mx-auto max-w-6xl px-4 py-16 md:px-6">
+				<div class="grid gap-5 md:grid-cols-2">
+					{segundaMetade.map((banda) => <BandCard banda={banda} />)}
+				</div>
+				<div class="mt-10 flex justify-center md:hidden">
+					<a href="/bandas" class="inline-flex items-center gap-1 text-sm text-ochre">
+						Ver todas
+						<Icon name="lucide:arrow-right" class="size-4" />
+					</a>
+				</div>
+			</section>
+		)
+	}
 </Base>
