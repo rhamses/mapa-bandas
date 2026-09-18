@@ -16,6 +16,8 @@ export type BandaData = {
 	imagem?: string;
 	fontes?: Array<{ titulo: string; url: string }>;
 	autor?: string;
+	/** False = ficha pública mostra “contribuição anônima”. Default true. */
+	creditoPublico?: boolean;
 };
 
 export type Banda = {
@@ -92,6 +94,7 @@ function coerceBandaData(raw: Record<string, unknown>): BandaData | null {
 		imagem: typeof raw.imagem === 'string' && raw.imagem ? raw.imagem : undefined,
 		fontes,
 		autor: typeof raw.autor === 'string' ? raw.autor : undefined,
+		creditoPublico: raw.creditoPublico === false ? false : true,
 	};
 }
 

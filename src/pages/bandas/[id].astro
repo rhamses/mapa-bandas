@@ -110,7 +110,18 @@ const jsonLd = {
 		}
 		<p class="mt-12 text-xs text-ink/40">
 			Entrada publicada em {banda.data.publicadoEm.toLocaleDateString('pt-BR', { timeZone: 'UTC' })}.
-			{banda.data.autor && <> Contribuição de {banda.data.autor}.</>}
+			{
+				banda.origem === 'submissao' ? (
+					<>
+						{' '}
+						{banda.data.creditoPublico !== false && banda.data.autor
+							? <>Contribuição de {banda.data.autor}.</>
+							: <>contribuição anônima</>}
+					</>
+				) : (
+					banda.data.autor && <> Contribuição de {banda.data.autor}.</>
+				)
+			}
 		</p>
 	</article>
 </Base>

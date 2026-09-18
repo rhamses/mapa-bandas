@@ -2,7 +2,7 @@ import { mkdir, readdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { Buffer } from 'node:buffer';
 import { env } from 'cloudflare:workers';
-import { parseMarkdown } from './markdown';
+import { buildMarkdownFile, parseMarkdown } from './markdown';
 
 const ROOT = path.join(process.cwd(), 'data', 'submissoes');
 const IMAGENS = path.join(ROOT, 'imagens');
@@ -25,6 +25,8 @@ export type SubmissaoMeta = {
 	savedAt: string;
 	status: SubmissaoStatus;
 	reviewedAt?: string;
+	/** Quando false, a ficha pública mostra “contribuição anônima”. */
+	creditoPublico?: boolean;
 };
 
 export type SavedSubmissao = {
@@ -43,6 +45,7 @@ export type SubmissaoRecord = {
 	autor?: string;
 	resumo?: string;
 	imagemUrl?: string;
+	creditoPublico: boolean;
 };
 
 async function tryWriteDisk(options: {
@@ -142,11 +145,13 @@ function normalizeMeta(raw: string | null, fallbackSavedAt?: string): SubmissaoM
 					? status
 					: 'aprovada',
 			reviewedAt: typeof parsed.reviewedAt === 'string' ? parsed.reviewedAt : undefined,
+			creditoPublico: parsed.creditoPublico === false ? false : true,
 		};
 	} catch {
 		return {
 			savedAt: fallbackSavedAt ?? new Date(0).toISOString(),
 			status: 'aprovada',
+			creditoPublico: true,
 		};
 	}
 }
@@ -158,6 +163,8 @@ function summarizeMarkdown(id: string, markdown: string, meta: SubmissaoMeta): S
 		typeof data.imagem === 'string' && data.imagem
 			? data.imagem
 			: undefined;
+	const fromFrontmatter =
+		data.creditoPublico === false ? false : data.creditoPublico === true ? true : undefined;
 
 	return {
 		id,
@@ -169,6 +176,7 @@ function summarizeMarkdown(id: string, markdown: string, meta: SubmissaoMeta): S
 		autor: typeof data.autor === 'string' ? data.autor : undefined,
 		resumo: typeof data.resumo === 'string' ? data.resumo : undefined,
 		imagemUrl: imagem,
+		creditoPublico: fromFrontmatter ?? meta.creditoPublico !== false,
 	};
 }
 
@@ -191,6 +199,7 @@ export async function saveSubmissao(options: {
 			email,
 			savedAt: new Date().toISOString(),
 			status,
+			creditoPublico: true,
 		} satisfies SubmissaoMeta),
 	);
 
@@ -282,9 +291,40 @@ export async function updateSubmissaoStatus(id: string, status: SubmissaoStatus)
 		...record.meta,
 		status,
 		reviewedAt: new Date().toISOString(),
+		creditoPublico: record.meta.creditoPublico !== false,
 	};
 	await env.SUBMISSOES.put(`${RECORD_META_PREFIX}${record.id}`, JSON.stringify(next));
 	return { ...record, meta: next };
+}
+
+export async function updateSubmissaoCredito(id: string, creditoPublico: boolean) {
+	const record = await getSubmissaoRecord(id);
+	if (!record) return null;
+
+	const parsed = parseMarkdown(record.markdown);
+	const nextMarkdown = buildMarkdownFile(
+		{
+			...parsed.data,
+			creditoPublico,
+		},
+		parsed.body,
+	);
+
+	await env.SUBMISSOES.put(`${MD_PREFIX}${record.id}`, nextMarkdown);
+	const nextMeta: SubmissaoMeta = {
+		...record.meta,
+		creditoPublico,
+	};
+	await env.SUBMISSOES.put(`${RECORD_META_PREFIX}${record.id}`, JSON.stringify(nextMeta));
+
+	try {
+		await mkdir(ROOT, { recursive: true });
+		await writeFile(path.join(ROOT, `${record.id}.md`), nextMarkdown, 'utf8');
+	} catch {
+		// FS indisponível no Worker
+	}
+
+	return summarizeMarkdown(record.id, nextMarkdown, nextMeta);
 }
 
 export async function deleteSubmissao(id: string) {

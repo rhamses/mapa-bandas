@@ -182,6 +182,7 @@ export async function POST({ request }: { request: Request }) {
 		publicadoEm: enviadoEm.slice(0, 10),
 		destaque: false,
 		autor,
+		creditoPublico: true,
 		...(imagemPath ? { imagem: imagemPath } : {}),
 		...(fontes.length ? { fontes } : {}),
 	};
