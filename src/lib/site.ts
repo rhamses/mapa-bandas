@@ -3,7 +3,7 @@ export const site = {
 	tagline: 'Arquivo da história das bandas locais do Brasil',
 	descricao:
 		'Repositório colaborativo da história das bandas locais brasileiras: artigos, mapa e um acervo em construção permanente.',
-	url: 'https://mapa-bandas.rhamses.workers.dev',
+	url: 'https://mapa-bandas.amb1.workers.dev',
 	idioma: 'pt-BR',
 	rss: '/rss.xml',
 };

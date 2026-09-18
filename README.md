@@ -22,13 +22,19 @@ Crie um **token público** em [account.mapbox.com/access-tokens](https://account
 
 ## Deploy
 
-O Worker sobe na conta pessoal (`rhamses.soares@gmail.com`), não na conta da amb1. A `account_id` está travada em `wrangler.jsonc`.
+O Worker sobe na conta **amb1** (`account_id` em `wrangler.jsonc`). O Cloudflare Pages do projeto está ligado ao GitHub e, a cada push em `main`, roda:
+
+```sh
+npm ci && npm run build && npx wrangler deploy
+```
+
+Isso publica o Worker em produção. Também há workflow em `.github/workflows/deploy-cloudflare.yml` (requer secrets `CLOUDFLARE_API_TOKEN` e `CLOUDFLARE_ACCOUNT_ID`).
 
 ```sh
 npm run deploy
 ```
 
-Produção: https://mapa-bandas.rhamses.workers.dev
+Produção: https://mapa-bandas.amb1.workers.dev
 
 ```sh
 npm run dev

@@ -1,7 +1,7 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "mapa-bandas",
-	"account_id": "e94a2dcc138e0d8cb51a991dc40fdbb7",
+	"account_id": "182788b23836a15ba32a69d616ba1db1",
 	"compatibility_date": "2026-09-17",
 	"compatibility_flags": ["nodejs_compat"],
 	"observability": {
@@ -10,11 +10,11 @@
 	"kv_namespaces": [
 		{
 			"binding": "SESSION",
-			"id": "f25c439182b042a9849024dea6eeed2a"
+			"id": "c4ec0aa46df14dbca1fc9d5d180b157f"
 		},
 		{
 			"binding": "SUBMISSOES",
-			"id": "d14e77da22694f67a2e32c8f56356128"
+			"id": "a968c85e8b3e4fe2bde753a81591b5e7"
 		}
 	]
 }
