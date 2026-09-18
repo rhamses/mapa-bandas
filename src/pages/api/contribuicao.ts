@@ -1,9 +1,8 @@
 export const prerender = false;
 
-import { coordsForUf } from '../../lib/coords';
 import { buildMarkdownFile } from '../../lib/markdown';
 import { slugifyNome } from '../../lib/bandas';
-import { ufs } from '../../lib/site';
+import { isValidBrazilCoords, isValidUf } from '../../lib/location';
 import {
 	contentTypeForExt,
 	extForContentType,
@@ -11,7 +10,6 @@ import {
 	type ImagemMeta,
 } from '../../lib/submissoes';
 
-const ufValidas = new Set(ufs.map((uf) => uf.sigla));
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 
@@ -27,6 +25,16 @@ function html(message: string, ok: boolean) {
 	return new Response(`<p class="${classes}">${message}</p>`, {
 		status: ok ? 200 : 400,
 		headers: { 'Content-Type': 'text/html; charset=utf-8' },
+	});
+}
+
+function successTrigger(message: string) {
+	return new Response('', {
+		status: 200,
+		headers: {
+			'Content-Type': 'text/html; charset=utf-8',
+			'HX-Trigger': JSON.stringify({ contribuicaoSucesso: { message } }),
+		},
 	});
 }
 
@@ -53,7 +61,6 @@ function parseFontes(value: string) {
 				const url = new URL(line);
 				return { titulo: url.hostname.replace(/^www\./, ''), url: url.href };
 			} catch {
-				// texto livre (livro, entrevista) — mantém o título sem inventar URL
 				return { titulo: line, url: '#' };
 			}
 		});
@@ -97,12 +104,15 @@ export async function POST({ request }: { request: Request }) {
 	const form = await request.formData();
 
 	if (field(form, 'website')) {
-		return html('Recebemos sua contribuição. Obrigado por escrever o arquivo.', true);
+		return successTrigger('Recebemos sua contribuição. Obrigado por escrever o arquivo.');
 	}
 
 	const nome = field(form, 'nome');
 	const cidade = field(form, 'cidade');
 	const uf = field(form, 'uf').toUpperCase();
+	const mapboxId = field(form, 'mapbox_id');
+	const lat = Number(field(form, 'lat'));
+	const lng = Number(field(form, 'lng'));
 	const formacaoRaw = field(form, 'formacao');
 	const generosRaw = field(form, 'generos');
 	const artigo = field(form, 'artigo');
@@ -112,9 +122,11 @@ export async function POST({ request }: { request: Request }) {
 	const enviadoEm = new Date().toISOString();
 
 	if (nome.length < 2) return html('Diga o nome da banda.', false);
-	if (cidade.length < 2) return html('Informe a cidade.', false);
-	if (!ufValidas.has(uf as (typeof ufs)[number]['sigla'])) {
-		return html('Escolha um estado válido.', false);
+	if (!mapboxId || cidade.length < 2 || !isValidUf(uf)) {
+		return html('Escolha a localização na busca de lugares.', false);
+	}
+	if (!isValidBrazilCoords(lat, lng)) {
+		return html('Escolha a localização na busca de lugares.', false);
 	}
 	if (artigo.length < 80) {
 		return html('O artigo precisa ter pelo menos 80 caracteres.', false);
@@ -129,7 +141,6 @@ export async function POST({ request }: { request: Request }) {
 
 	const slug = slugifyNome(nome) || 'banda';
 	const id = `${enviadoEm.slice(0, 19).replace(/[:T]/g, '-')}-${slug}`;
-	const coords = coordsForUf(uf);
 	const formacao = formacaoRaw ? Number(formacaoRaw) : new Date().getFullYear();
 	const generos = parseGeneros(generosRaw);
 	const fontes = parseFontes(fontesRaw);
@@ -141,8 +152,8 @@ export async function POST({ request }: { request: Request }) {
 		nome,
 		cidade,
 		uf,
-		lat: coords.lat,
-		lng: coords.lng,
+		lat,
+		lng,
 		formacao: Number.isFinite(formacao) ? Math.trunc(formacao) : new Date().getFullYear(),
 		generos,
 		resumo: resumoFromArtigo(artigo),
@@ -168,8 +179,13 @@ export async function POST({ request }: { request: Request }) {
 		return html('Não foi possível salvar a contribuição agora. Tente de novo em instantes.', false);
 	}
 
+<<<<<<< HEAD
 	return html(
 		'Recebemos sua contribuição. Ela entrou em revisão e, depois de aprovada, aparece no arquivo.',
 		true,
+=======
+	return successTrigger(
+		'Recebemos sua contribuição. Ela entrou em revisão e, depois de aprovada, aparece no arquivo.',
+>>>>>>> origin/main
 	);
 }
