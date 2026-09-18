@@ -35,6 +35,7 @@ export default defineConfig({
 					'globe',
 					'book-open',
 					'image',
+					'image-plus',
 				],
 			},
 		}),
