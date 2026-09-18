@@ -3,19 +3,16 @@ import { Icon } from 'astro-icon/components';
 import { ufs } from '../lib/site';
 ---
 
-<form
-	id="form-contribuicao"
-	class="grid gap-5"
-	enctype="multipart/form-data"
-	hx-post="/api/contribuicao"
-	hx-encoding="multipart/form-data"
-	hx-target="#form-status"
-	hx-swap="innerHTML"
+<div
+	class="relative"
 	x-data="{
 		artigo: '',
 		honeypot: '',
 		imagemNome: '',
 		imagemPreview: '',
+		enviando: false,
+		sucessoAberto: false,
+		sucessoMensagem: '',
 		onImagem(event) {
 			const file = event.target.files?.[0];
 			if (this.imagemPreview) URL.revokeObjectURL(this.imagemPreview);
@@ -33,124 +30,217 @@ import { ufs } from '../lib/site';
 			if (this.imagemPreview) URL.revokeObjectURL(this.imagemPreview);
 			this.imagemNome = '';
 			this.imagemPreview = '';
-		}
+		},
+		limparFormulario() {
+			const form = this.$refs.form;
+			if (form) form.reset();
+			this.artigo = '';
+			this.honeypot = '';
+			this.limparImagem();
+			const status = this.$refs.status;
+			if (status) status.innerHTML = '';
+		},
+		fecharSucesso() {
+			this.sucessoAberto = false;
+			this.sucessoMensagem = '';
+		},
+		onAntesEnvio() {
+			this.enviando = true;
+		},
+		onDepoisEnvio(event) {
+			this.enviando = false;
+			if (!event.detail.successful) return;
+			const trigger = event.detail.xhr.getResponseHeader('HX-Trigger');
+			if (!trigger || !trigger.includes('contribuicaoSucesso')) return;
+			try {
+				const payload = JSON.parse(trigger);
+				this.sucessoMensagem =
+					payload.contribuicaoSucesso?.message ||
+					'Recebemos sua contribuição. Ela entrou em revisão e, depois de aprovada, aparece no arquivo.';
+			} catch {
+				this.sucessoMensagem =
+					'Recebemos sua contribuição. Ela entrou em revisão e, depois de aprovada, aparece no arquivo.';
+			}
+			this.limparFormulario();
+			this.sucessoAberto = true;
+			this.$nextTick(() => this.$refs.fecharSucesso?.focus());
+		},
 	}"
+	@keydown.escape.window="sucessoAberto && fecharSucesso()"
 >
-	<div class="grid gap-5 md:grid-cols-2">
-		<label class="grid gap-2 text-sm">
-			<span>Nome da banda</span>
-			<input required name="nome" minlength="2" class="rounded-xl border border-ink/15 bg-white px-4 py-3 outline-none focus:border-ochre" />
-		</label>
-		<label class="grid gap-2 text-sm">
-			<span>Ano de formação</span>
-			<input name="formacao" type="number" min="1900" max="2026" class="rounded-xl border border-ink/15 bg-white px-4 py-3 outline-none focus:border-ochre" />
-		</label>
-	</div>
+	<form
+		id="form-contribuicao"
+		x-ref="form"
+		class="grid gap-5"
+		enctype="multipart/form-data"
+		hx-post="/api/contribuicao"
+		hx-encoding="multipart/form-data"
+		hx-target="#form-status"
+		hx-swap="innerHTML"
+		hx-disabled-elt="find button[type='submit']"
+		@htmx:before-request="onAntesEnvio()"
+		@htmx:after-request="onDepoisEnvio($event)"
+		:aria-busy="enviando.toString()"
+		:class="enviando && 'pointer-events-none opacity-80'"
+	>
+		<div class="grid gap-5 md:grid-cols-2">
+			<label class="grid gap-2 text-sm">
+				<span>Nome da banda</span>
+				<input required name="nome" minlength="2" class="rounded-xl border border-ink/15 bg-white px-4 py-3 outline-none focus:border-ochre" />
+			</label>
+			<label class="grid gap-2 text-sm">
+				<span>Ano de formação</span>
+				<input name="formacao" type="number" min="1900" max="2026" class="rounded-xl border border-ink/15 bg-white px-4 py-3 outline-none focus:border-ochre" />
+			</label>
+		</div>
 
-	<div class="grid gap-5 md:grid-cols-[1.4fr_0.8fr]">
-		<label class="grid gap-2 text-sm">
-			<span>Cidade</span>
-			<input required name="cidade" class="rounded-xl border border-ink/15 bg-white px-4 py-3 outline-none focus:border-ochre" />
-		</label>
-		<label class="grid gap-2 text-sm">
-			<span>Estado</span>
-			<div class="relative">
-				<select required name="uf" class="w-full appearance-none rounded-xl border border-ink/15 bg-white px-4 py-3 outline-none focus:border-ochre">
-					<option value="">UF</option>
-					{ufs.map((uf) => <option value={uf.sigla}>{uf.sigla} — {uf.nome}</option>)}
-				</select>
-				<Icon name="lucide:chevrons-up-down" class="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-ink/40" />
-			</div>
-		</label>
-	</div>
+		<div class="grid gap-5 md:grid-cols-[1.4fr_0.8fr]">
+			<label class="grid gap-2 text-sm">
+				<span>Cidade</span>
+				<input required name="cidade" class="rounded-xl border border-ink/15 bg-white px-4 py-3 outline-none focus:border-ochre" />
+			</label>
+			<label class="grid gap-2 text-sm">
+				<span>Estado</span>
+				<div class="relative">
+					<select required name="uf" class="w-full appearance-none rounded-xl border border-ink/15 bg-white px-4 py-3 outline-none focus:border-ochre">
+						<option value="">UF</option>
+						{ufs.map((uf) => <option value={uf.sigla}>{uf.sigla} — {uf.nome}</option>)}
+					</select>
+					<Icon name="lucide:chevrons-up-down" class="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-ink/40" />
+				</div>
+			</label>
+		</div>
 
-	<label class="grid gap-2 text-sm">
-		<span>Gêneros (separados por vírgula)</span>
-		<input name="generos" placeholder="Manguebeat, psicodelia, punk" class="rounded-xl border border-ink/15 bg-white px-4 py-3 outline-none focus:border-ochre" />
-	</label>
+		<label class="grid gap-2 text-sm">
+			<span>Gêneros (separados por vírgula)</span>
+			<input name="generos" placeholder="Manguebeat, psicodelia, punk" class="rounded-xl border border-ink/15 bg-white px-4 py-3 outline-none focus:border-ochre" />
+		</label>
 
-	<div class="grid gap-2 text-sm">
-		<span class="font-medium">Imagem da banda</span>
-		<label
-			class="relative grid cursor-pointer place-items-center gap-3 overflow-hidden rounded-2xl border-2 border-dashed border-ochre/50 bg-ochre/5 px-4 py-8 text-center transition hover:border-ochre hover:bg-ochre/10"
-			:class="imagemPreview && 'border-solid border-ochre/30 bg-white p-0'"
-		>
-			<input
-				x-ref="imagemInput"
-				name="imagem"
-				type="file"
-				accept="image/jpeg,image/png,image/webp,image/gif"
-				class="sr-only"
-				@change="onImagem($event)"
-			/>
-			<template x-if="!imagemPreview">
-				<span class="grid place-items-center gap-2">
-					<span class="grid size-12 place-items-center rounded-full bg-ochre text-paper">
-						<Icon name="lucide:image-plus" class="size-6" />
+		<div class="grid gap-2 text-sm">
+			<span class="font-medium">Imagem da banda</span>
+			<label
+				class="relative grid cursor-pointer place-items-center gap-3 overflow-hidden rounded-2xl border-2 border-dashed border-ochre/50 bg-ochre/5 px-4 py-8 text-center transition hover:border-ochre hover:bg-ochre/10"
+				:class="imagemPreview && 'border-solid border-ochre/30 bg-white p-0'"
+			>
+				<input
+					x-ref="imagemInput"
+					name="imagem"
+					type="file"
+					accept="image/jpeg,image/png,image/webp,image/gif"
+					class="sr-only"
+					@change="onImagem($event)"
+				/>
+				<template x-if="!imagemPreview">
+					<span class="grid place-items-center gap-2">
+						<span class="grid size-12 place-items-center rounded-full bg-ochre text-paper">
+							<Icon name="lucide:image-plus" class="size-6" />
+						</span>
+						<span class="text-base font-medium text-ink">Clique para escolher uma imagem</span>
+						<span class="text-xs text-ink/55">JPG, PNG, WebP ou GIF · até 5 MB</span>
 					</span>
-					<span class="text-base font-medium text-ink">Clique para escolher uma imagem</span>
-					<span class="text-xs text-ink/55">JPG, PNG, WebP ou GIF · até 5 MB</span>
-				</span>
-			</template>
-			<template x-if="imagemPreview">
-				<span class="relative block w-full">
-					<img :src="imagemPreview" alt="Pré-visualização da imagem" class="aspect-[16/9] w-full object-cover" />
-					<span class="absolute inset-x-0 bottom-0 bg-ink/70 px-3 py-2 text-left text-xs text-paper" x-text="imagemNome"></span>
-				</span>
-			</template>
+				</template>
+				<template x-if="imagemPreview">
+					<span class="relative block w-full">
+						<img :src="imagemPreview" alt="Pré-visualização da imagem" class="aspect-[16/9] w-full object-cover" />
+						<span class="absolute inset-x-0 bottom-0 bg-ink/70 px-3 py-2 text-left text-xs text-paper" x-text="imagemNome"></span>
+					</span>
+				</template>
+			</label>
+			<button
+				type="button"
+				class="justify-self-start text-xs text-ochre underline-offset-2 hover:underline"
+				x-show="imagemPreview"
+				x-cloak
+				@click="limparImagem()"
+			>
+				Remover imagem
+			</button>
+		</div>
+
+		<label class="grid gap-2 text-sm">
+			<span>Artigo</span>
+			<textarea
+				required
+				name="artigo"
+				minlength="80"
+				rows="10"
+				x-model="artigo"
+				placeholder="Conte a história da banda, a cidade, a cena e por que ela importa."
+				class="rounded-xl border border-ink/15 bg-white px-4 py-3 outline-none focus:border-ochre"
+			></textarea>
+			<span class="text-xs text-ink/45" x-text="`${artigo.trim().length} caracteres · mínimo 80`"></span>
 		</label>
+
+		<label class="grid gap-2 text-sm">
+			<span>Fontes e links</span>
+			<textarea name="fontes" rows="3" placeholder="URLs, livros, entrevistas, acervos" class="rounded-xl border border-ink/15 bg-white px-4 py-3 outline-none focus:border-ochre"></textarea>
+		</label>
+
+		<div class="grid gap-5 md:grid-cols-2">
+			<label class="grid gap-2 text-sm">
+				<span>Seu nome</span>
+				<input required name="autor" class="rounded-xl border border-ink/15 bg-white px-4 py-3 outline-none focus:border-ochre" />
+			</label>
+			<label class="grid gap-2 text-sm">
+				<span>E-mail</span>
+				<input required name="email" type="email" class="rounded-xl border border-ink/15 bg-white px-4 py-3 outline-none focus:border-ochre" />
+			</label>
+		</div>
+
+		<div class="hidden" aria-hidden="true">
+			<input name="website" tabindex="-1" autocomplete="off" x-model="honeypot" />
+		</div>
+
+		<div id="form-status" x-ref="status"></div>
+
+		<button
+			type="submit"
+			class="inline-flex items-center justify-center gap-2 rounded-full bg-ochre px-6 py-3 text-sm font-medium text-paper transition hover:bg-ochre-hot disabled:cursor-not-allowed disabled:opacity-60"
+			:disabled="enviando"
+		>
+			<template x-if="!enviando">
+				<span class="inline-flex items-center gap-2">
+					<Icon name="lucide:send" class="size-4" />
+					Enviar contribuição
+				</span>
+			</template>
+			<template x-if="enviando">
+				<span>Enviando…</span>
+			</template>
+		</button>
+	</form>
+
+	<div
+		x-show="sucessoAberto"
+		x-cloak
+		class="fixed inset-0 z-50 grid place-items-center bg-paper px-6"
+		role="dialog"
+		aria-modal="true"
+		aria-labelledby="contribuicao-sucesso-titulo"
+		x-transition.opacity
+	>
 		<button
 			type="button"
-			class="justify-self-start text-xs text-ochre underline-offset-2 hover:underline"
-			x-show="imagemPreview"
-			x-cloak
-			@click="limparImagem()"
+			class="absolute right-4 top-4 inline-flex size-11 items-center justify-center rounded-full border border-ink/15 text-ink/70 transition hover:border-ink hover:text-ink md:right-8 md:top-8"
+			x-ref="fecharSucesso"
+			aria-label="Fechar"
+			@click="fecharSucesso()"
 		>
-			Remover imagem
+			<Icon name="lucide:x" class="size-5" />
 		</button>
+		<div class="mx-auto max-w-lg text-center">
+			<p class="text-xs uppercase tracking-[0.22em] text-ochre">obrigado</p>
+			<h2 id="contribuicao-sucesso-titulo" class="mt-4 font-serif text-4xl tracking-tight md:text-5xl">
+				Contribuição recebida
+			</h2>
+			<p class="mt-5 text-lg leading-relaxed text-ink/70" x-text="sucessoMensagem"></p>
+			<button
+				type="button"
+				class="mt-10 inline-flex items-center justify-center rounded-full bg-ink px-6 py-3 text-sm font-medium text-paper transition hover:bg-ochre"
+				@click="fecharSucesso()"
+			>
+				Fechar
+			</button>
+		</div>
 	</div>
-
-	<label class="grid gap-2 text-sm">
-		<span>Artigo</span>
-		<textarea
-			required
-			name="artigo"
-			minlength="80"
-			rows="10"
-			x-model="artigo"
-			placeholder="Conte a história da banda, a cidade, a cena e por que ela importa."
-			class="rounded-xl border border-ink/15 bg-white px-4 py-3 outline-none focus:border-ochre"
-		></textarea>
-		<span class="text-xs text-ink/45" x-text="`${artigo.trim().length} caracteres · mínimo 80`"></span>
-	</label>
-
-	<label class="grid gap-2 text-sm">
-		<span>Fontes e links</span>
-		<textarea name="fontes" rows="3" placeholder="URLs, livros, entrevistas, acervos" class="rounded-xl border border-ink/15 bg-white px-4 py-3 outline-none focus:border-ochre"></textarea>
-	</label>
-
-	<div class="grid gap-5 md:grid-cols-2">
-		<label class="grid gap-2 text-sm">
-			<span>Seu nome</span>
-			<input required name="autor" class="rounded-xl border border-ink/15 bg-white px-4 py-3 outline-none focus:border-ochre" />
-		</label>
-		<label class="grid gap-2 text-sm">
-			<span>E-mail</span>
-			<input required name="email" type="email" class="rounded-xl border border-ink/15 bg-white px-4 py-3 outline-none focus:border-ochre" />
-		</label>
-	</div>
-
-	<div class="hidden" aria-hidden="true">
-		<input name="website" tabindex="-1" autocomplete="off" x-model="honeypot" />
-	</div>
-
-	<div id="form-status"></div>
-
-	<button
-		type="submit"
-		class="inline-flex items-center justify-center gap-2 rounded-full bg-ochre px-6 py-3 text-sm font-medium text-paper transition hover:bg-ochre-hot"
-	>
-		<Icon name="lucide:send" class="size-4" />
-		Enviar contribuição
-	</button>
-</form>
+</div>
