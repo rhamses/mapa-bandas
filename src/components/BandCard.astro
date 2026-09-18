@@ -17,6 +17,18 @@ const href = permalink(banda);
 		featured && 'md:min-h-72',
 	]}
 >
+	{
+		banda.data.imagem && (
+			<div class="mb-5 -mx-6 -mt-6 overflow-hidden border-b border-ink/10">
+				<img
+					src={banda.data.imagem}
+					alt={`Imagem de ${banda.data.nome}`}
+					class="aspect-[16/9] w-full object-cover transition duration-500 group-hover:scale-[1.02]"
+					loading="lazy"
+				/>
+			</div>
+		)
+	}
 	<div>
 		<p class="text-[11px] uppercase tracking-[0.22em] text-ochre">
 			{local(banda)} · {periodo(banda)}

@@ -21,8 +21,11 @@ pnpm-debug.log*
 .env.production
 .dev.vars
 
-# contribution drafts
+# contribution drafts / runtime uploads
 data/submissoes/*.json
+data/submissoes/*.md
+data/submissoes/imagens/*
+!data/submissoes/imagens/.gitkeep
 
 # macOS-specific files
 .DS_Store

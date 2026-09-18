@@ -5,6 +5,7 @@ import sitemap from '@astrojs/sitemap';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig, envField } from 'astro/config';
 import icon from 'astro-icon';
+import { submissoesDiskMirror } from './scripts/submissoes-disk-mirror.mjs';
 
 export default defineConfig({
 	site: 'https://mapa-bandas.rhamses.workers.dev',
@@ -33,6 +34,7 @@ export default defineConfig({
 					'chevrons-up-down',
 					'globe',
 					'book-open',
+					'image',
 				],
 			},
 		}),
@@ -41,7 +43,7 @@ export default defineConfig({
 		}),
 	],
 	vite: {
-		plugins: [tailwindcss()],
+		plugins: [tailwindcss(), submissoesDiskMirror()],
 	},
 	env: {
 		schema: {

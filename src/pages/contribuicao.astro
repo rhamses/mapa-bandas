@@ -18,11 +18,15 @@ import Base from '../layouts/Base.astro';
 			<ul class="mt-8 space-y-4 text-sm text-ink/70">
 				<li class="flex gap-3">
 					<Icon name="lucide:book-open" class="mt-0.5 size-4 text-ochre" />
-					Artigos entram como rascunho e passam por revisão antes de aparecer no mapa.
+					Cada envio grava um Markdown em <code class="text-ochre">data/submissoes/</code> e o site lê ao vivo, sem rebuild.
+				</li>
+				<li class="flex gap-3">
+					<Icon name="lucide:image" class="mt-0.5 size-4 text-ochre" />
+					Você pode anexar uma imagem da banda; ela fica ao lado do artigo no arquivo.
 				</li>
 				<li class="flex gap-3">
 					<Icon name="lucide:map-pin" class="mt-0.5 size-4 text-ochre" />
-					Inclua cidade e estado. Coordenadas podem ser ajustadas na edição.
+					Inclua cidade e estado. Coordenadas começam pela capital da UF e podem ser ajustadas depois.
 				</li>
 				<li class="flex gap-3">
 					<Icon name="lucide:music" class="mt-0.5 size-4 text-ochre" />
