@@ -1,5 +1,6 @@
--- mapa-bandas: submissões, imagens (meta) e sessões admin no D1 demos
--- bytes das fotos ficam no R2 demo-bucket (prefixo mapa-bandas/)
+-- mapa-bandas: submissões, imagens (meta) e sessões admin
+-- Preferir D1 dedicado; `demos` estourou free-tier de leituras.
+-- Bytes das fotos: R2 demo-bucket (prefixo mapa-bandas/)
 
 CREATE TABLE IF NOT EXISTS mb_submissoes (
   id TEXT PRIMARY KEY,
