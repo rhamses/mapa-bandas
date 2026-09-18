@@ -190,19 +190,21 @@ export async function saveSubmissao(options: {
 	imagem?: { bytes: Uint8Array; meta: ImagemMeta } | null;
 	origin?: string;
 	status?: SubmissaoStatus;
+	savedAt?: string;
 }): Promise<SavedSubmissao> {
 	const { id, markdown, email, imagem, origin } = options;
 	let imagemPath: string | undefined;
 	const status = options.status ?? 'pendente';
+	const savedAt = options.savedAt ?? new Date().toISOString();
 
 	await env.SUBMISSOES.put(`${MD_PREFIX}${id}`, markdown);
 	await env.SUBMISSOES.put(
 		`${RECORD_META_PREFIX}${id}`,
 		JSON.stringify({
 			email,
-			savedAt: new Date().toISOString(),
+			savedAt,
 			status,
-			reviewedAt: status === 'aprovada' || status === 'rejeitada' ? new Date().toISOString() : undefined,
+			reviewedAt: status === 'aprovada' || status === 'rejeitada' ? savedAt : undefined,
 			creditoPublico: true,
 		} satisfies SubmissaoMeta),
 	);
@@ -261,7 +263,21 @@ export async function listSubmissaoMarkdown(options?: {
 	return [...byId.entries()]
 		.map(([id, item]) => ({ id, markdown: item.markdown, meta: item.meta }))
 		.filter((item) => (allowed ? allowed.has(item.meta.status) : true))
-		.sort((a, b) => b.meta.savedAt.localeCompare(a.meta.savedAt));
+		.sort((a, b) => {
+			const byDate = b.meta.savedAt.localeCompare(a.meta.savedAt);
+			if (byDate !== 0) return byDate;
+			return b.id.localeCompare(a.id);
+		});
+}
+
+function savedAtFromMarkdown(markdown: string, fallbackId: string) {
+	const parsed = parseMarkdown(markdown);
+	const raw = parsed.data.publicadoEm;
+	if (raw !== undefined && raw !== null && raw !== '') {
+		const date = new Date(String(raw));
+		if (!Number.isNaN(date.valueOf())) return date.toISOString();
+	}
+	return guessSavedAtFromId(fallbackId);
 }
 
 /** Importa o acervo seed como submissões aprovadas (uma vez por id). */
@@ -269,19 +285,46 @@ export async function ensureSeedSubmissoes() {
 	for (const { id, markdown } of listSeedMarkdown()) {
 		const doneKey = `${SEED_DONE_PREFIX}${id}`;
 		const alreadyDone = await env.SUBMISSOES.get(doneKey);
-		if (alreadyDone) continue;
-
 		const existing = await env.SUBMISSOES.get(`${MD_PREFIX}${id}`);
+		const seedSavedAt = savedAtFromMarkdown(markdown, id);
+
 		if (!existing) {
 			await saveSubmissao({
 				id,
 				markdown,
 				email: 'seed@mapa-bandas.local',
 				status: 'aprovada',
+				savedAt: seedSavedAt,
 			});
+		} else if (!alreadyDone) {
+			// Já existia no KV sem marcador: só alinha a data ao frontmatter do seed
+			const metaRaw = await env.SUBMISSOES.get(`${RECORD_META_PREFIX}${id}`);
+			const meta = normalizeMeta(metaRaw, seedSavedAt);
+			await env.SUBMISSOES.put(
+				`${RECORD_META_PREFIX}${id}`,
+				JSON.stringify({ ...meta, savedAt: seedSavedAt, email: meta.email ?? 'seed@mapa-bandas.local' }),
+			);
 		}
 
-		await env.SUBMISSOES.put(doneKey, '1');
+		if (!alreadyDone) {
+			await env.SUBMISSOES.put(doneKey, '1');
+		}
+	}
+
+	// Repara datas de seed já importadas com timestamp de deploy (v1)
+	const datesKey = 'seed-dates:v1';
+	if (!(await env.SUBMISSOES.get(datesKey))) {
+		for (const { id, markdown } of listSeedMarkdown()) {
+			const metaRaw = await env.SUBMISSOES.get(`${RECORD_META_PREFIX}${id}`);
+			if (!metaRaw) continue;
+			const meta = normalizeMeta(metaRaw, savedAtFromMarkdown(markdown, id));
+			const seedSavedAt = savedAtFromMarkdown(markdown, id);
+			await env.SUBMISSOES.put(
+				`${RECORD_META_PREFIX}${id}`,
+				JSON.stringify({ ...meta, savedAt: seedSavedAt }),
+			);
+		}
+		await env.SUBMISSOES.put(datesKey, '1');
 	}
 }
 
