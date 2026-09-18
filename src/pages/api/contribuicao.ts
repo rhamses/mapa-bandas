@@ -51,9 +51,8 @@ function parseGeneros(value: string) {
 		.filter(Boolean);
 }
 
-function parseFontes(value: string) {
-	return value
-		.split(/\r?\n/)
+function parseFontes(values: string[]) {
+	return values
 		.map((line) => line.trim())
 		.filter(Boolean)
 		.map((line) => {
@@ -117,7 +116,10 @@ export async function POST({ request }: { request: Request }) {
 	const encerramentoRaw = field(form, 'encerramento');
 	const generosRaw = field(form, 'generos');
 	const artigo = field(form, 'artigo');
-	const fontesRaw = field(form, 'fontes');
+	const fontesRaw = form
+		.getAll('fonte')
+		.map((value) => (typeof value === 'string' ? value.trim() : ''))
+		.filter(Boolean);
 	const autor = field(form, 'autor');
 	const email = field(form, 'email');
 	const enviadoEm = new Date().toISOString();
