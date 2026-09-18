@@ -8,7 +8,7 @@ import icon from 'astro-icon';
 import { submissoesDiskMirror } from './scripts/submissoes-disk-mirror.mjs';
 
 export default defineConfig({
-	site: 'https://mapa-bandas.rhamses.workers.dev',
+	site: 'https://mapa-bandas.amb1.workers.dev',
 	adapter: cloudflare({
 		imageService: 'passthrough',
 	}),

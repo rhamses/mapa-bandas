@@ -10,6 +10,7 @@ Arquivo da história das bandas locais do Brasil. Site em Astro com Tailwind, HT
 - Alpine.js no menu e no modal do mapa
 - Mapbox GL JS
 - RSS, sitemap, robots.txt e Astro Icon
+- Cloudflare **Workers** (não Pages)
 
 ## Setup
 
@@ -20,15 +21,38 @@ cp .env.example .env
 
 Crie um **token público** em [account.mapbox.com/access-tokens](https://account.mapbox.com/access-tokens/) e coloque em `PUBLIC_MAPBOX_TOKEN`. Ele precisa começar com `pk.` — tokens `sk.` são secretos e o mapa no browser recusa. Sem o token, o resto do site funciona; a página `/mapa` mostra o aviso de configuração. Reinicie o `npm run dev` depois de salvar o `.env`.
 
-## Deploy
+## Deploy (Worker)
 
-O Worker sobe na conta pessoal (`rhamses.soares@gmail.com`), não na conta da amb1. A `account_id` está travada em `wrangler.jsonc`.
+O app é um **Cloudflare Worker** na conta amb1 (`account_id` em `wrangler.jsonc`).
+
+Produção: https://mapa-bandas.amb1.workers.dev
+
+### Deploy local
 
 ```sh
 npm run deploy
 ```
 
-Produção: https://mapa-bandas.rhamses.workers.dev
+### Deploy a partir do GitHub (Workers Builds)
+
+1. Abra o Worker [mapa-bandas](https://dash.cloudflare.com/182788b23836a15ba32a69d616ba1db1/workers/services/view/mapa-bandas) → **Settings** → **Builds** → **Connect**.
+2. Autorize o GitHub e selecione `rhamses/mapa-bandas`.
+3. Configure:
+   - **Build command:** `npm run build`
+   - **Deploy command:** `npx wrangler deploy`
+   - **Non-production branch deploy command:** `npx wrangler versions upload`
+   - **Production branch:** `main`
+4. Em Variables do build, opcional: `PUBLIC_MAPBOX_TOKEN`.
+
+Depois disso, cada push em `main` builda e publica o **Worker** (sem projeto Pages).
+
+### Alternativa: GitHub Actions
+
+O workflow `.github/workflows/ci.yml` valida o build em PRs. Em push para `main`, faz `wrangler deploy` se existirem os secrets:
+
+- `CLOUDFLARE_API_TOKEN`
+- `CLOUDFLARE_ACCOUNT_ID` = `182788b23836a15ba32a69d616ba1db1`
+- `PUBLIC_MAPBOX_TOKEN` (opcional)
 
 ```sh
 npm run dev
