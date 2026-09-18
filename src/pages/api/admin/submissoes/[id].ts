@@ -28,11 +28,11 @@ export async function POST({
 	request: Request;
 }) {
 	if (!sameOrigin(request)) {
-		return html('Origem inválida.', false);
+		return html('Pedido não autorizado.', false);
 	}
 
 	const id = sanitizeId(params.id ?? '');
-	if (!id) return html('Identificador inválido.', false);
+	if (!id) return html('Contribuição inválida.', false);
 
 	const form = await request.formData();
 	const action = String(form.get('action') ?? '').trim();

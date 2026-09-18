@@ -9,7 +9,7 @@ import {
 
 export async function POST({ request }: { request: Request }) {
 	if (!sameOrigin(request)) {
-		return new Response('Origem inválida.', { status: 403 });
+		return new Response('Pedido não autorizado.', { status: 403 });
 	}
 
 	await destroyAdminSession(request);

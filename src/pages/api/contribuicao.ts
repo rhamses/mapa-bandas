@@ -165,11 +165,11 @@ export async function POST({ request }: { request: Request }) {
 		});
 	} catch (error) {
 		console.error('Falha ao gravar contribuição', error);
-		return html('Não foi possível gravar a contribuição agora. Tente de novo em instantes.', false);
+		return html('Não foi possível salvar a contribuição agora. Tente de novo em instantes.', false);
 	}
 
 	return html(
-		'Recebemos sua contribuição. Ela entrou na fila de revisão e, após aprovação, aparece no arquivo ao vivo — sem rebuild.',
+		'Recebemos sua contribuição. Ela entrou em revisão e, depois de aprovada, aparece no arquivo.',
 		true,
 	);
 }

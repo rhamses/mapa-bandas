@@ -9,7 +9,7 @@ const bandas = await getBandas();
 const geojson = toMapaFeatures(bandas);
 ---
 
-<MapaLayout title="Mapa" description="Mapa em tela cheia das bandas locais do Brasil. Dê zoom para revelar os pins e abra o arquivo de cada cidade.">
+<MapaLayout title="Mapa" description="Mapa em tela cheia das bandas locais do Brasil. Dê zoom para revelar os pontos e abra o arquivo de cada cidade.">
 	<div class="absolute inset-0 z-0">
 		<div id="mapa" class="h-full w-full"></div>
 	</div>
@@ -20,7 +20,7 @@ const geojson = toMapaFeatures(bandas);
 			{bandas.length} bandas no acervo
 		</p>
 		<p class="pointer-events-auto mt-2 leading-relaxed">
-			Quanto mais zoom, mais pins aparecem. Clique em um ponto para ler o arquivo da banda.
+			Quanto mais zoom, mais pontos aparecem. Clique em um deles para ler o arquivo da banda.
 		</p>
 	</div>
 
@@ -29,12 +29,10 @@ const geojson = toMapaFeatures(bandas);
 		class="absolute inset-0 z-20 hidden place-items-center bg-ink px-6 text-center"
 	>
 		<div class="max-w-lg">
-			<p class="text-xs uppercase tracking-[0.22em] text-gold">Mapbox</p>
-			<h1 id="mapa-aviso-titulo" class="mt-3 font-serif text-4xl">Falta o token do mapa</h1>
+			<p class="text-xs uppercase tracking-[0.22em] text-gold">mapa</p>
+			<h1 id="mapa-aviso-titulo" class="mt-3 font-serif text-4xl">Mapa indisponível</h1>
 			<p id="mapa-aviso-texto" class="mt-4 text-paper/70">
-				Crie um token público (começa com <code class="text-gold">pk.</code>) em account.mapbox.com e coloque em
-				<code class="text-gold">PUBLIC_MAPBOX_TOKEN</code> no arquivo <code class="text-gold">.env</code>. Depois reinicie o
-				<code class="text-gold">npm run dev</code>.
+				Não foi possível carregar o mapa agora. Volte em instantes ou explore o arquivo pelas bandas.
 			</p>
 		</div>
 	</div>
@@ -62,7 +60,7 @@ const geojson = toMapaFeatures(bandas);
 				type="button"
 				class="absolute right-4 top-4 rounded-full p-2 text-ink/50 hover:bg-ink/5 hover:text-ink"
 				@click="$store.modal.close()"
-				aria-label="Fechar modal"
+				aria-label="Fechar"
 			>
 				<Icon name="lucide:x" class="size-5" />
 			</button>
