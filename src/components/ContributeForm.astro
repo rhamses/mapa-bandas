@@ -1,21 +1,32 @@
 ---
 import { Icon } from 'astro-icon/components';
-import { ufs } from '../lib/site';
+import { PUBLIC_MAPBOX_TOKEN } from 'astro:env/client';
+
+const mapboxToken = PUBLIC_MAPBOX_TOKEN ?? '';
 ---
 
-<form
-	id="form-contribuicao"
-	class="grid gap-5"
-	enctype="multipart/form-data"
-	hx-post="/api/contribuicao"
-	hx-encoding="multipart/form-data"
-	hx-target="#form-status"
-	hx-swap="innerHTML"
+<div
+	class="relative"
+	data-mapbox-token={mapboxToken}
 	x-data="{
+		mapboxToken: '',
 		artigo: '',
 		honeypot: '',
 		imagemNome: '',
 		imagemPreview: '',
+		enviando: false,
+		sucessoAberto: false,
+		sucessoMensagem: '',
+		localQuery: '',
+		localSugestoes: [],
+		localBuscando: false,
+		localErro: '',
+		localAberto: false,
+		selecionado: null,
+		buscaTimer: null,
+		init() {
+			this.mapboxToken = this.$el.dataset.mapboxToken || '';
+		},
 		onImagem(event) {
 			const file = event.target.files?.[0];
 			if (this.imagemPreview) URL.revokeObjectURL(this.imagemPreview);
@@ -33,124 +44,356 @@ import { ufs } from '../lib/site';
 			if (this.imagemPreview) URL.revokeObjectURL(this.imagemPreview);
 			this.imagemNome = '';
 			this.imagemPreview = '';
-		}
+		},
+		limparLocalizacao() {
+			this.localQuery = '';
+			this.localSugestoes = [];
+			this.localErro = '';
+			this.localAberto = false;
+			this.selecionado = null;
+			this.localBuscando = false;
+		},
+		limparFormulario() {
+			const form = this.$refs.form;
+			if (form) form.reset();
+			this.artigo = '';
+			this.honeypot = '';
+			this.limparImagem();
+			this.limparLocalizacao();
+			const status = this.$refs.status;
+			if (status) status.innerHTML = '';
+		},
+		fecharSucesso() {
+			this.sucessoAberto = false;
+			this.sucessoMensagem = '';
+		},
+		onAntesEnvio(event) {
+			if (!this.selecionado) {
+				event.preventDefault();
+				this.localErro = 'Escolha um lugar na lista da busca.';
+				this.$refs.localInput?.focus();
+				return;
+			}
+			this.enviando = true;
+			this.localErro = '';
+		},
+		onDepoisEnvio(event) {
+			this.enviando = false;
+			if (!event.detail.successful) return;
+			const trigger = event.detail.xhr.getResponseHeader('HX-Trigger');
+			if (!trigger || !trigger.includes('contribuicaoSucesso')) return;
+			try {
+				const payload = JSON.parse(trigger);
+				this.sucessoMensagem =
+					payload.contribuicaoSucesso?.message ||
+					'Recebemos sua contribuição. Ela entrou em revisão e, depois de aprovada, aparece no arquivo.';
+			} catch {
+				this.sucessoMensagem =
+					'Recebemos sua contribuição. Ela entrou em revisão e, depois de aprovada, aparece no arquivo.';
+			}
+			this.limparFormulario();
+			this.sucessoAberto = true;
+			this.$nextTick(() => this.$refs.fecharSucesso?.focus());
+		},
+		onLocalInput() {
+			this.selecionado = null;
+			this.localErro = '';
+			const query = this.localQuery.trim();
+			if (this.buscaTimer) clearTimeout(this.buscaTimer);
+			if (query.length < 2) {
+				this.localSugestoes = [];
+				this.localAberto = false;
+				this.localBuscando = false;
+				return;
+			}
+			if (!this.mapboxToken) {
+				this.localErro = 'A busca de localização está indisponível no momento.';
+				return;
+			}
+			this.buscaTimer = setTimeout(() => this.buscarLocal(query), 280);
+		},
+		async buscarLocal(query) {
+			this.localBuscando = true;
+			try {
+				const url = new URL(
+					'https://api.mapbox.com/geocoding/v5/mapbox.places/' + encodeURIComponent(query) + '.json',
+				);
+				url.searchParams.set('access_token', this.mapboxToken);
+				url.searchParams.set('country', 'br');
+				url.searchParams.set('language', 'pt');
+				url.searchParams.set('types', 'place,locality,neighborhood');
+				url.searchParams.set('limit', '6');
+				const response = await fetch(url);
+				if (!response.ok) {
+					this.localSugestoes = [];
+					this.localAberto = false;
+					this.localErro = 'Não foi possível buscar lugares agora.';
+					return;
+				}
+				const payload = await response.json();
+				const items = [];
+				for (const feature of payload.features || []) {
+					if (!feature?.id || !feature.center || feature.center.length < 2) continue;
+					const [lng, lat] = feature.center;
+					const region = (feature.context || []).find((item) => String(item.id || '').startsWith('region.'));
+					const shortCode = region?.short_code || feature.properties?.short_code || '';
+					const ufMatch = /(?:BR-)?([A-Za-z]{2})/.exec(shortCode);
+					const uf = ufMatch ? ufMatch[1].toUpperCase() : '';
+					const placeCtx = (feature.context || []).find((item) => String(item.id || '').startsWith('place.'));
+					const cidade = (placeCtx?.text || feature.text || '').trim();
+					if (!cidade || !uf) continue;
+					items.push({
+						id: feature.id,
+						label: feature.place_name || cidade + ', ' + uf,
+						cidade,
+						uf,
+						lat,
+						lng,
+					});
+				}
+				this.localSugestoes = items;
+				this.localAberto = items.length > 0;
+				if (!items.length) this.localErro = 'Nenhum lugar encontrado. Tente outro nome.';
+			} catch {
+				this.localSugestoes = [];
+				this.localAberto = false;
+				this.localErro = 'Não foi possível buscar lugares agora.';
+			} finally {
+				this.localBuscando = false;
+			}
+		},
+		escolherLocal(item) {
+			this.selecionado = item;
+			this.localQuery = item.label;
+			this.localSugestoes = [];
+			this.localAberto = false;
+			this.localErro = '';
+		},
 	}"
+	@keydown.escape.window="sucessoAberto ? fecharSucesso() : (localAberto = false)"
 >
-	<div class="grid gap-5 md:grid-cols-2">
-		<label class="grid gap-2 text-sm">
-			<span>Nome da banda</span>
-			<input required name="nome" minlength="2" class="rounded-xl border border-ink/15 bg-white px-4 py-3 outline-none focus:border-ochre" />
-		</label>
-		<label class="grid gap-2 text-sm">
-			<span>Ano de formação</span>
-			<input name="formacao" type="number" min="1900" max="2026" class="rounded-xl border border-ink/15 bg-white px-4 py-3 outline-none focus:border-ochre" />
-		</label>
-	</div>
+	<form
+		id="form-contribuicao"
+		x-ref="form"
+		class="grid gap-5"
+		enctype="multipart/form-data"
+		hx-post="/api/contribuicao"
+		hx-encoding="multipart/form-data"
+		hx-target="#form-status"
+		hx-swap="innerHTML"
+		hx-disabled-elt="find button[type='submit']"
+		@htmx:before-request="onAntesEnvio($event)"
+		@htmx:after-request="onDepoisEnvio($event)"
+		:aria-busy="enviando.toString()"
+		:class="enviando && 'pointer-events-none opacity-80'"
+	>
+		<div class="grid gap-5 md:grid-cols-2">
+			<label class="grid gap-2 text-sm">
+				<span>Nome da banda</span>
+				<input required name="nome" minlength="2" class="rounded-xl border border-ink/15 bg-white px-4 py-3 outline-none focus:border-ochre" />
+			</label>
+			<label class="grid gap-2 text-sm">
+				<span>Ano de formação</span>
+				<input name="formacao" type="number" min="1900" max="2026" class="rounded-xl border border-ink/15 bg-white px-4 py-3 outline-none focus:border-ochre" />
+			</label>
+		</div>
 
-	<div class="grid gap-5 md:grid-cols-[1.4fr_0.8fr]">
-		<label class="grid gap-2 text-sm">
-			<span>Cidade</span>
-			<input required name="cidade" class="rounded-xl border border-ink/15 bg-white px-4 py-3 outline-none focus:border-ochre" />
-		</label>
-		<label class="grid gap-2 text-sm">
-			<span>Estado</span>
+		<div class="grid gap-2 text-sm" @click.outside="localAberto = false">
+			<span class="font-medium">Localização</span>
+			<p class="text-xs text-ink/55">Busque a cidade e escolha um resultado da lista. Só assim o ponto entra certo no mapa.</p>
 			<div class="relative">
-				<select required name="uf" class="w-full appearance-none rounded-xl border border-ink/15 bg-white px-4 py-3 outline-none focus:border-ochre">
-					<option value="">UF</option>
-					{ufs.map((uf) => <option value={uf.sigla}>{uf.sigla} — {uf.nome}</option>)}
-				</select>
-				<Icon name="lucide:chevrons-up-down" class="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-ink/40" />
+				<span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink/40">
+					<Icon name="lucide:search" class="size-4" />
+				</span>
+				<input
+					x-ref="localInput"
+					type="search"
+					autocomplete="off"
+					placeholder="Ex.: Recife, PE"
+					class="w-full rounded-xl border border-ink/15 bg-white py-3 pl-10 pr-10 outline-none focus:border-ochre"
+					:class="selecionado && 'border-forest/40'"
+					x-model="localQuery"
+					@input="onLocalInput()"
+					@focus="localAberto = localSugestoes.length > 0"
+					aria-autocomplete="list"
+					aria-controls="local-sugestoes"
+					:aria-expanded="localAberto.toString()"
+				/>
+				<span
+					class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-ink/40"
+					x-show="localBuscando"
+					x-cloak
+				>
+					…
+				</span>
+				<ul
+					id="local-sugestoes"
+					class="absolute z-20 mt-2 max-h-64 w-full overflow-auto rounded-2xl border border-ink/10 bg-white py-2 shadow-lg"
+					x-show="localAberto"
+					x-cloak
+					role="listbox"
+				>
+					<template x-for="item in localSugestoes" :key="item.id">
+						<li>
+							<button
+								type="button"
+								class="flex w-full items-start gap-2 px-4 py-2.5 text-left text-sm transition hover:bg-ochre/10"
+								role="option"
+								@click="escolherLocal(item)"
+							>
+								<span class="mt-0.5 text-ochre">
+									<Icon name="lucide:map-pin" class="size-3.5" />
+								</span>
+								<span>
+									<span class="block font-medium text-ink" x-text="item.cidade + ', ' + item.uf"></span>
+									<span class="block text-xs text-ink/50" x-text="item.label"></span>
+								</span>
+							</button>
+						</li>
+					</template>
+				</ul>
 			</div>
+			<p class="text-xs text-forest" x-show="selecionado" x-cloak>
+				Selecionado: <span x-text="selecionado?.cidade + ', ' + selecionado?.uf"></span>
+			</p>
+			<p class="text-xs text-clay" x-show="localErro" x-cloak x-text="localErro"></p>
+			<input type="hidden" name="cidade" :value="selecionado?.cidade || ''" />
+			<input type="hidden" name="uf" :value="selecionado?.uf || ''" />
+			<input type="hidden" name="lat" :value="selecionado?.lat ?? ''" />
+			<input type="hidden" name="lng" :value="selecionado?.lng ?? ''" />
+			<input type="hidden" name="mapbox_id" :value="selecionado?.id || ''" />
+		</div>
+
+		<label class="grid gap-2 text-sm">
+			<span>Gêneros (separados por vírgula)</span>
+			<input name="generos" placeholder="Manguebeat, psicodelia, punk" class="rounded-xl border border-ink/15 bg-white px-4 py-3 outline-none focus:border-ochre" />
 		</label>
-	</div>
 
-	<label class="grid gap-2 text-sm">
-		<span>Gêneros (separados por vírgula)</span>
-		<input name="generos" placeholder="Manguebeat, psicodelia, punk" class="rounded-xl border border-ink/15 bg-white px-4 py-3 outline-none focus:border-ochre" />
-	</label>
-
-	<div class="grid gap-2 text-sm">
-		<span class="font-medium">Imagem da banda</span>
-		<label
-			class="relative grid cursor-pointer place-items-center gap-3 overflow-hidden rounded-2xl border-2 border-dashed border-ochre/50 bg-ochre/5 px-4 py-8 text-center transition hover:border-ochre hover:bg-ochre/10"
-			:class="imagemPreview && 'border-solid border-ochre/30 bg-white p-0'"
-		>
-			<input
-				x-ref="imagemInput"
-				name="imagem"
-				type="file"
-				accept="image/jpeg,image/png,image/webp,image/gif"
-				class="sr-only"
-				@change="onImagem($event)"
-			/>
-			<template x-if="!imagemPreview">
-				<span class="grid place-items-center gap-2">
-					<span class="grid size-12 place-items-center rounded-full bg-ochre text-paper">
-						<Icon name="lucide:image-plus" class="size-6" />
+		<div class="grid gap-2 text-sm">
+			<span class="font-medium">Imagem da banda</span>
+			<label
+				class="relative grid cursor-pointer place-items-center gap-3 overflow-hidden rounded-2xl border-2 border-dashed border-ochre/50 bg-ochre/5 px-4 py-8 text-center transition hover:border-ochre hover:bg-ochre/10"
+				:class="imagemPreview && 'border-solid border-ochre/30 bg-white p-0'"
+			>
+				<input
+					x-ref="imagemInput"
+					name="imagem"
+					type="file"
+					accept="image/jpeg,image/png,image/webp,image/gif"
+					class="sr-only"
+					@change="onImagem($event)"
+				/>
+				<template x-if="!imagemPreview">
+					<span class="grid place-items-center gap-2">
+						<span class="grid size-12 place-items-center rounded-full bg-ochre text-paper">
+							<Icon name="lucide:image-plus" class="size-6" />
+						</span>
+						<span class="text-base font-medium text-ink">Clique para escolher uma imagem</span>
+						<span class="text-xs text-ink/55">JPG, PNG, WebP ou GIF · até 5 MB</span>
 					</span>
-					<span class="text-base font-medium text-ink">Clique para escolher uma imagem</span>
-					<span class="text-xs text-ink/55">JPG, PNG, WebP ou GIF · até 5 MB</span>
-				</span>
-			</template>
-			<template x-if="imagemPreview">
-				<span class="relative block w-full">
-					<img :src="imagemPreview" alt="Pré-visualização da imagem" class="aspect-[16/9] w-full object-cover" />
-					<span class="absolute inset-x-0 bottom-0 bg-ink/70 px-3 py-2 text-left text-xs text-paper" x-text="imagemNome"></span>
-				</span>
-			</template>
+				</template>
+				<template x-if="imagemPreview">
+					<span class="relative block w-full">
+						<img :src="imagemPreview" alt="Pré-visualização da imagem" class="aspect-[16/9] w-full object-cover" />
+						<span class="absolute inset-x-0 bottom-0 bg-ink/70 px-3 py-2 text-left text-xs text-paper" x-text="imagemNome"></span>
+					</span>
+				</template>
+			</label>
+			<button
+				type="button"
+				class="justify-self-start text-xs text-ochre underline-offset-2 hover:underline"
+				x-show="imagemPreview"
+				x-cloak
+				@click="limparImagem()"
+			>
+				Remover imagem
+			</button>
+		</div>
+
+		<label class="grid gap-2 text-sm">
+			<span>Artigo</span>
+			<textarea
+				required
+				name="artigo"
+				minlength="80"
+				rows="10"
+				x-model="artigo"
+				placeholder="Conte a história da banda, a cidade, a cena e por que ela importa."
+				class="rounded-xl border border-ink/15 bg-white px-4 py-3 outline-none focus:border-ochre"
+			></textarea>
+			<span class="text-xs text-ink/45" x-text="`${artigo.trim().length} caracteres · mínimo 80`"></span>
 		</label>
+
+		<label class="grid gap-2 text-sm">
+			<span>Fontes e links</span>
+			<textarea name="fontes" rows="3" placeholder="URLs, livros, entrevistas, acervos" class="rounded-xl border border-ink/15 bg-white px-4 py-3 outline-none focus:border-ochre"></textarea>
+		</label>
+
+		<div class="grid gap-5 md:grid-cols-2">
+			<label class="grid gap-2 text-sm">
+				<span>Seu nome</span>
+				<input required name="autor" class="rounded-xl border border-ink/15 bg-white px-4 py-3 outline-none focus:border-ochre" />
+			</label>
+			<label class="grid gap-2 text-sm">
+				<span>E-mail</span>
+				<input required name="email" type="email" class="rounded-xl border border-ink/15 bg-white px-4 py-3 outline-none focus:border-ochre" />
+			</label>
+		</div>
+
+		<div class="hidden" aria-hidden="true">
+			<input name="website" tabindex="-1" autocomplete="off" x-model="honeypot" />
+		</div>
+
+		<div id="form-status" x-ref="status"></div>
+
+		<button
+			type="submit"
+			class="inline-flex items-center justify-center gap-2 rounded-full bg-ochre px-6 py-3 text-sm font-medium text-paper transition hover:bg-ochre-hot disabled:cursor-not-allowed disabled:opacity-60"
+			:disabled="enviando"
+		>
+			<template x-if="!enviando">
+				<span class="inline-flex items-center gap-2">
+					<Icon name="lucide:send" class="size-4" />
+					Enviar contribuição
+				</span>
+			</template>
+			<template x-if="enviando">
+				<span>Enviando…</span>
+			</template>
+		</button>
+	</form>
+
+	<div
+		x-show="sucessoAberto"
+		x-cloak
+		class="fixed inset-0 z-50 grid place-items-center bg-paper px-6"
+		role="dialog"
+		aria-modal="true"
+		aria-labelledby="contribuicao-sucesso-titulo"
+		x-transition.opacity
+	>
 		<button
 			type="button"
-			class="justify-self-start text-xs text-ochre underline-offset-2 hover:underline"
-			x-show="imagemPreview"
-			x-cloak
-			@click="limparImagem()"
+			class="absolute right-4 top-4 inline-flex size-11 items-center justify-center rounded-full border border-ink/15 text-ink/70 transition hover:border-ink hover:text-ink md:right-8 md:top-8"
+			x-ref="fecharSucesso"
+			aria-label="Fechar"
+			@click="fecharSucesso()"
 		>
-			Remover imagem
+			<Icon name="lucide:x" class="size-5" />
 		</button>
+		<div class="mx-auto max-w-lg text-center">
+			<p class="text-xs uppercase tracking-[0.22em] text-ochre">obrigado</p>
+			<h2 id="contribuicao-sucesso-titulo" class="mt-4 font-serif text-4xl tracking-tight md:text-5xl">
+				Contribuição recebida
+			</h2>
+			<p class="mt-5 text-lg leading-relaxed text-ink/70" x-text="sucessoMensagem"></p>
+			<button
+				type="button"
+				class="mt-10 inline-flex items-center justify-center rounded-full bg-ink px-6 py-3 text-sm font-medium text-paper transition hover:bg-ochre"
+				@click="fecharSucesso()"
+			>
+				Fechar
+			</button>
+		</div>
 	</div>
-
-	<label class="grid gap-2 text-sm">
-		<span>Artigo</span>
-		<textarea
-			required
-			name="artigo"
-			minlength="80"
-			rows="10"
-			x-model="artigo"
-			placeholder="Conte a história da banda, a cidade, a cena e por que ela importa."
-			class="rounded-xl border border-ink/15 bg-white px-4 py-3 outline-none focus:border-ochre"
-		></textarea>
-		<span class="text-xs text-ink/45" x-text="`${artigo.trim().length} caracteres · mínimo 80`"></span>
-	</label>
-
-	<label class="grid gap-2 text-sm">
-		<span>Fontes e links</span>
-		<textarea name="fontes" rows="3" placeholder="URLs, livros, entrevistas, acervos" class="rounded-xl border border-ink/15 bg-white px-4 py-3 outline-none focus:border-ochre"></textarea>
-	</label>
-
-	<div class="grid gap-5 md:grid-cols-2">
-		<label class="grid gap-2 text-sm">
-			<span>Seu nome</span>
-			<input required name="autor" class="rounded-xl border border-ink/15 bg-white px-4 py-3 outline-none focus:border-ochre" />
-		</label>
-		<label class="grid gap-2 text-sm">
-			<span>E-mail</span>
-			<input required name="email" type="email" class="rounded-xl border border-ink/15 bg-white px-4 py-3 outline-none focus:border-ochre" />
-		</label>
-	</div>
-
-	<div class="hidden" aria-hidden="true">
-		<input name="website" tabindex="-1" autocomplete="off" x-model="honeypot" />
-	</div>
-
-	<div id="form-status"></div>
-
-	<button
-		type="submit"
-		class="inline-flex items-center justify-center gap-2 rounded-full bg-ochre px-6 py-3 text-sm font-medium text-paper transition hover:bg-ochre-hot"
-	>
-		<Icon name="lucide:send" class="size-4" />
-		Enviar contribuição
-	</button>
-</form>
+</div>
