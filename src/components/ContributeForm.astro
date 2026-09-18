@@ -1,11 +1,15 @@
 ---
 import { Icon } from 'astro-icon/components';
-import { ufs } from '../lib/site';
+import { PUBLIC_MAPBOX_TOKEN } from 'astro:env/client';
+
+const mapboxToken = PUBLIC_MAPBOX_TOKEN ?? '';
 ---
 
 <div
 	class="relative"
+	data-mapbox-token={mapboxToken}
 	x-data="{
+		mapboxToken: '',
 		artigo: '',
 		honeypot: '',
 		imagemNome: '',
@@ -13,6 +17,16 @@ import { ufs } from '../lib/site';
 		enviando: false,
 		sucessoAberto: false,
 		sucessoMensagem: '',
+		localQuery: '',
+		localSugestoes: [],
+		localBuscando: false,
+		localErro: '',
+		localAberto: false,
+		selecionado: null,
+		buscaTimer: null,
+		init() {
+			this.mapboxToken = this.$el.dataset.mapboxToken || '';
+		},
 		onImagem(event) {
 			const file = event.target.files?.[0];
 			if (this.imagemPreview) URL.revokeObjectURL(this.imagemPreview);
@@ -31,12 +45,21 @@ import { ufs } from '../lib/site';
 			this.imagemNome = '';
 			this.imagemPreview = '';
 		},
+		limparLocalizacao() {
+			this.localQuery = '';
+			this.localSugestoes = [];
+			this.localErro = '';
+			this.localAberto = false;
+			this.selecionado = null;
+			this.localBuscando = false;
+		},
 		limparFormulario() {
 			const form = this.$refs.form;
 			if (form) form.reset();
 			this.artigo = '';
 			this.honeypot = '';
 			this.limparImagem();
+			this.limparLocalizacao();
 			const status = this.$refs.status;
 			if (status) status.innerHTML = '';
 		},
@@ -44,8 +67,15 @@ import { ufs } from '../lib/site';
 			this.sucessoAberto = false;
 			this.sucessoMensagem = '';
 		},
-		onAntesEnvio() {
+		onAntesEnvio(event) {
+			if (!this.selecionado) {
+				event.preventDefault();
+				this.localErro = 'Escolha um lugar na lista da busca.';
+				this.$refs.localInput?.focus();
+				return;
+			}
 			this.enviando = true;
+			this.localErro = '';
 		},
 		onDepoisEnvio(event) {
 			this.enviando = false;
@@ -65,8 +95,82 @@ import { ufs } from '../lib/site';
 			this.sucessoAberto = true;
 			this.$nextTick(() => this.$refs.fecharSucesso?.focus());
 		},
+		onLocalInput() {
+			this.selecionado = null;
+			this.localErro = '';
+			const query = this.localQuery.trim();
+			if (this.buscaTimer) clearTimeout(this.buscaTimer);
+			if (query.length < 2) {
+				this.localSugestoes = [];
+				this.localAberto = false;
+				this.localBuscando = false;
+				return;
+			}
+			if (!this.mapboxToken) {
+				this.localErro = 'A busca de localização está indisponível no momento.';
+				return;
+			}
+			this.buscaTimer = setTimeout(() => this.buscarLocal(query), 280);
+		},
+		async buscarLocal(query) {
+			this.localBuscando = true;
+			try {
+				const url = new URL(
+					'https://api.mapbox.com/geocoding/v5/mapbox.places/' + encodeURIComponent(query) + '.json',
+				);
+				url.searchParams.set('access_token', this.mapboxToken);
+				url.searchParams.set('country', 'br');
+				url.searchParams.set('language', 'pt');
+				url.searchParams.set('types', 'place,locality,neighborhood');
+				url.searchParams.set('limit', '6');
+				const response = await fetch(url);
+				if (!response.ok) {
+					this.localSugestoes = [];
+					this.localAberto = false;
+					this.localErro = 'Não foi possível buscar lugares agora.';
+					return;
+				}
+				const payload = await response.json();
+				const items = [];
+				for (const feature of payload.features || []) {
+					if (!feature?.id || !feature.center || feature.center.length < 2) continue;
+					const [lng, lat] = feature.center;
+					const region = (feature.context || []).find((item) => String(item.id || '').startsWith('region.'));
+					const shortCode = region?.short_code || feature.properties?.short_code || '';
+					const ufMatch = /(?:BR-)?([A-Za-z]{2})/.exec(shortCode);
+					const uf = ufMatch ? ufMatch[1].toUpperCase() : '';
+					const placeCtx = (feature.context || []).find((item) => String(item.id || '').startsWith('place.'));
+					const cidade = (placeCtx?.text || feature.text || '').trim();
+					if (!cidade || !uf) continue;
+					items.push({
+						id: feature.id,
+						label: feature.place_name || cidade + ', ' + uf,
+						cidade,
+						uf,
+						lat,
+						lng,
+					});
+				}
+				this.localSugestoes = items;
+				this.localAberto = items.length > 0;
+				if (!items.length) this.localErro = 'Nenhum lugar encontrado. Tente outro nome.';
+			} catch {
+				this.localSugestoes = [];
+				this.localAberto = false;
+				this.localErro = 'Não foi possível buscar lugares agora.';
+			} finally {
+				this.localBuscando = false;
+			}
+		},
+		escolherLocal(item) {
+			this.selecionado = item;
+			this.localQuery = item.label;
+			this.localSugestoes = [];
+			this.localAberto = false;
+			this.localErro = '';
+		},
 	}"
-	@keydown.escape.window="sucessoAberto && fecharSucesso()"
+	@keydown.escape.window="sucessoAberto ? fecharSucesso() : (localAberto = false)"
 >
 	<form
 		id="form-contribuicao"
@@ -78,7 +182,7 @@ import { ufs } from '../lib/site';
 		hx-target="#form-status"
 		hx-swap="innerHTML"
 		hx-disabled-elt="find button[type='submit']"
-		@htmx:before-request="onAntesEnvio()"
+		@htmx:before-request="onAntesEnvio($event)"
 		@htmx:after-request="onDepoisEnvio($event)"
 		:aria-busy="enviando.toString()"
 		:class="enviando && 'pointer-events-none opacity-80'"
@@ -94,21 +198,70 @@ import { ufs } from '../lib/site';
 			</label>
 		</div>
 
-		<div class="grid gap-5 md:grid-cols-[1.4fr_0.8fr]">
-			<label class="grid gap-2 text-sm">
-				<span>Cidade</span>
-				<input required name="cidade" class="rounded-xl border border-ink/15 bg-white px-4 py-3 outline-none focus:border-ochre" />
-			</label>
-			<label class="grid gap-2 text-sm">
-				<span>Estado</span>
-				<div class="relative">
-					<select required name="uf" class="w-full appearance-none rounded-xl border border-ink/15 bg-white px-4 py-3 outline-none focus:border-ochre">
-						<option value="">UF</option>
-						{ufs.map((uf) => <option value={uf.sigla}>{uf.sigla} — {uf.nome}</option>)}
-					</select>
-					<Icon name="lucide:chevrons-up-down" class="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-ink/40" />
-				</div>
-			</label>
+		<div class="grid gap-2 text-sm" @click.outside="localAberto = false">
+			<span class="font-medium">Localização</span>
+			<p class="text-xs text-ink/55">Busque a cidade e escolha um resultado da lista. Só assim o ponto entra certo no mapa.</p>
+			<div class="relative">
+				<span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink/40">
+					<Icon name="lucide:search" class="size-4" />
+				</span>
+				<input
+					x-ref="localInput"
+					type="search"
+					autocomplete="off"
+					placeholder="Ex.: Recife, PE"
+					class="w-full rounded-xl border border-ink/15 bg-white py-3 pl-10 pr-10 outline-none focus:border-ochre"
+					:class="selecionado && 'border-forest/40'"
+					x-model="localQuery"
+					@input="onLocalInput()"
+					@focus="localAberto = localSugestoes.length > 0"
+					aria-autocomplete="list"
+					aria-controls="local-sugestoes"
+					:aria-expanded="localAberto.toString()"
+				/>
+				<span
+					class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-ink/40"
+					x-show="localBuscando"
+					x-cloak
+				>
+					…
+				</span>
+				<ul
+					id="local-sugestoes"
+					class="absolute z-20 mt-2 max-h-64 w-full overflow-auto rounded-2xl border border-ink/10 bg-white py-2 shadow-lg"
+					x-show="localAberto"
+					x-cloak
+					role="listbox"
+				>
+					<template x-for="item in localSugestoes" :key="item.id">
+						<li>
+							<button
+								type="button"
+								class="flex w-full items-start gap-2 px-4 py-2.5 text-left text-sm transition hover:bg-ochre/10"
+								role="option"
+								@click="escolherLocal(item)"
+							>
+								<span class="mt-0.5 text-ochre">
+									<Icon name="lucide:map-pin" class="size-3.5" />
+								</span>
+								<span>
+									<span class="block font-medium text-ink" x-text="item.cidade + ', ' + item.uf"></span>
+									<span class="block text-xs text-ink/50" x-text="item.label"></span>
+								</span>
+							</button>
+						</li>
+					</template>
+				</ul>
+			</div>
+			<p class="text-xs text-forest" x-show="selecionado" x-cloak>
+				Selecionado: <span x-text="selecionado?.cidade + ', ' + selecionado?.uf"></span>
+			</p>
+			<p class="text-xs text-clay" x-show="localErro" x-cloak x-text="localErro"></p>
+			<input type="hidden" name="cidade" :value="selecionado?.cidade || ''" />
+			<input type="hidden" name="uf" :value="selecionado?.uf || ''" />
+			<input type="hidden" name="lat" :value="selecionado?.lat ?? ''" />
+			<input type="hidden" name="lng" :value="selecionado?.lng ?? ''" />
+			<input type="hidden" name="mapbox_id" :value="selecionado?.id || ''" />
 		</div>
 
 		<label class="grid gap-2 text-sm">
