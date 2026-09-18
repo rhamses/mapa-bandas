@@ -8,7 +8,7 @@ import Base from '../layouts/Base.astro';
 
 <Base
 	title="Contribuição"
-	description="Envie um artigo sobre uma banda local brasileira. A submissão é pública e entra em revisão para o arquivo."
+	description="Envie um artigo sobre uma banda local brasileira. A submissão entra em revisão antes de ir ao arquivo."
 >
 	<section class="mx-auto grid max-w-6xl gap-12 px-4 py-16 md:grid-cols-[0.9fr_1.1fr] md:px-6 md:py-24">
 		<div>
@@ -20,7 +20,7 @@ import Base from '../layouts/Base.astro';
 			<ul class="mt-8 space-y-4 text-sm text-ink/70">
 				<li class="flex gap-3">
 					<Icon name="lucide:book-open" class="mt-0.5 size-4 text-ochre" />
-					Cada envio grava um Markdown em <code class="text-ochre">data/submissoes/</code> e o site lê ao vivo, sem rebuild.
+					Cada envio grava um Markdown e fica na fila de revisão. Depois de aprovado, o site lê ao vivo, sem rebuild.
 				</li>
 				<li class="flex gap-3">
 					<Icon name="lucide:image" class="mt-0.5 size-4 text-ochre" />

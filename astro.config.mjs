@@ -40,7 +40,10 @@ export default defineConfig({
 			},
 		}),
 		sitemap({
-			filter: (page) => !page.includes('/api/') && !page.includes('/partials/'),
+			filter: (page) =>
+				!page.includes('/api/') &&
+				!page.includes('/partials/') &&
+				!page.includes('/admin'),
 		}),
 	],
 	vite: {
