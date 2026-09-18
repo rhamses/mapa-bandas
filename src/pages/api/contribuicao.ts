@@ -11,6 +11,7 @@ import {
 } from '../../lib/submissoes';
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const MAX_IMAGES = 8;
 const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 
 function field(form: FormData, name: string) {
@@ -65,38 +66,40 @@ function parseFontes(values: string[]) {
 		});
 }
 
-async function readImagem(form: FormData): Promise<
-	{ ok: true; value: { bytes: Uint8Array; meta: ImagemMeta } | null } | { ok: false; error: string }
+async function readImagens(form: FormData): Promise<
+	| { ok: true; value: Array<{ bytes: Uint8Array; meta: ImagemMeta }> }
+	| { ok: false; error: string }
 > {
-	const file = form.get('imagem');
-	if (!file || typeof file === 'string') return { ok: true, value: null };
-	if (!(file instanceof File)) return { ok: true, value: null };
-	if (!file.size) return { ok: true, value: null };
+	const files = [
+		...form.getAll('imagens'),
+		...form.getAll('imagem'),
+	].filter((item): item is File => item instanceof File && item.size > 0);
 
-	if (file.size > MAX_IMAGE_BYTES) {
-		return { ok: false, error: 'A imagem pode ter no máximo 5 MB.' };
+	if (files.length > MAX_IMAGES) {
+		return { ok: false, error: `Envie no máximo ${MAX_IMAGES} imagens.` };
 	}
 
-	const type = file.type || contentTypeForExt(file.name.split('.').pop() ?? '');
-	if (!ALLOWED_IMAGE_TYPES.has(type)) {
-		return { ok: false, error: 'Envie uma imagem JPG, PNG, WebP ou GIF.' };
-	}
-
-	const ext = extForContentType(type);
-	if (!ext) return { ok: false, error: 'Formato de imagem não suportado.' };
-
-	const bytes = new Uint8Array(await file.arrayBuffer());
-	return {
-		ok: true,
-		value: {
-			bytes,
+	const out: Array<{ bytes: Uint8Array; meta: ImagemMeta }> = [];
+	for (const file of files) {
+		if (file.size > MAX_IMAGE_BYTES) {
+			return { ok: false, error: 'Cada imagem pode ter no máximo 5 MB.' };
+		}
+		const type = file.type || contentTypeForExt(file.name.split('.').pop() ?? '');
+		if (!ALLOWED_IMAGE_TYPES.has(type)) {
+			return { ok: false, error: 'Envie imagens JPG, PNG, WebP ou GIF.' };
+		}
+		const ext = extForContentType(type);
+		if (!ext) return { ok: false, error: 'Formato de imagem não suportado.' };
+		out.push({
+			bytes: new Uint8Array(await file.arrayBuffer()),
 			meta: {
 				contentType: type,
 				filename: file.name || `imagem.${ext}`,
 				ext,
 			},
-		},
-	};
+		});
+	}
+	return { ok: true, value: out };
 }
 
 export async function POST({ request }: { request: Request }) {
@@ -158,16 +161,18 @@ export async function POST({ request }: { request: Request }) {
 		}
 	}
 
-	const imagemResult = await readImagem(form);
-	if (!imagemResult.ok) return html(imagemResult.error, false);
+	const imagensResult = await readImagens(form);
+	if (!imagensResult.ok) return html(imagensResult.error, false);
 
 	const slug = slugifyNome(nome) || 'banda';
 	const id = `${enviadoEm.slice(0, 19).replace(/[:T]/g, '-')}-${slug}`;
 	const generos = parseGeneros(generosRaw);
 	const fontes = parseFontes(fontesRaw);
-	const imagemPath = imagemResult.value
-		? `/media/submissoes/${id}.${imagemResult.value.meta.ext}`
-		: undefined;
+	const capa = imagensResult.value[0];
+	const imagemPath = capa ? `/media/submissoes/${id}/0.${capa.meta.ext}` : undefined;
+	const imagensPaths = imagensResult.value.map(
+		(item, index) => `/media/submissoes/${id}/${index}.${item.meta.ext}`,
+	);
 
 	const frontmatter: Record<string, unknown> = {
 		nome,
@@ -184,6 +189,7 @@ export async function POST({ request }: { request: Request }) {
 		autor,
 		creditoPublico: true,
 		...(imagemPath ? { imagem: imagemPath } : {}),
+		...(imagensPaths.length ? { imagens: imagensPaths } : {}),
 		...(fontes.length ? { fontes } : {}),
 	};
 
@@ -194,8 +200,7 @@ export async function POST({ request }: { request: Request }) {
 			id,
 			markdown,
 			email,
-			imagem: imagemResult.value,
-			origin: new URL(request.url).origin,
+			imagens: imagensResult.value,
 		});
 	} catch (error) {
 		console.error('Falha ao gravar contribuição', error);

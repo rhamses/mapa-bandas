@@ -1,7 +1,6 @@
 import { env } from 'cloudflare:workers';
 
 const COOKIE = 'mb_admin_session';
-const SESSION_PREFIX = 'admin:';
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7;
 
 export type AdminSession = {
@@ -69,28 +68,41 @@ export function readSessionToken(request: Request) {
 export async function getAdminSession(request: Request): Promise<AdminSession | null> {
 	const token = readSessionToken(request);
 	if (!token || token.length < 24) return null;
-	const raw = await env.SESSION.get(`${SESSION_PREFIX}${token}`);
-	if (!raw) return null;
-	try {
-		return JSON.parse(raw) as AdminSession;
-	} catch {
-		return null;
-	}
+
+	const row = await env.DB.prepare(
+		`SELECT user, created_at FROM mb_admin_sessions
+     WHERE token = ? AND expires_at > ?`,
+	)
+		.bind(token, new Date().toISOString())
+		.first<{ user: string; created_at: string }>();
+
+	if (!row) return null;
+	return { user: row.user, createdAt: row.created_at };
 }
 
 export async function createAdminSession(user: string) {
 	const token = crypto.randomUUID().replaceAll('-', '') + crypto.randomUUID().replaceAll('-', '');
-	const session: AdminSession = { user, createdAt: new Date().toISOString() };
-	await env.SESSION.put(`${SESSION_PREFIX}${token}`, JSON.stringify(session), {
-		expirationTtl: SESSION_TTL_SECONDS,
-	});
+	const createdAt = new Date().toISOString();
+	const expiresAt = new Date(Date.now() + SESSION_TTL_SECONDS * 1000).toISOString();
+
+	await env.DB.prepare(
+		`INSERT INTO mb_admin_sessions (token, user, created_at, expires_at) VALUES (?, ?, ?, ?)`,
+	)
+		.bind(token, user, createdAt, expiresAt)
+		.run();
+
+	// limpeza oportunista
+	await env.DB.prepare(`DELETE FROM mb_admin_sessions WHERE expires_at <= ?`)
+		.bind(new Date().toISOString())
+		.run();
+
 	return token;
 }
 
 export async function destroyAdminSession(request: Request) {
 	const token = readSessionToken(request);
 	if (token) {
-		await env.SESSION.delete(`${SESSION_PREFIX}${token}`);
+		await env.DB.prepare(`DELETE FROM mb_admin_sessions WHERE token = ?`).bind(token).run();
 	}
 }
 

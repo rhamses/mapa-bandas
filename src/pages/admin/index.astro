@@ -139,13 +139,28 @@ const to = Math.min(pagina * PAGE_SIZE, filtradas.length);
 						}
 
 						{
-							item.imagemUrl && (
+							item.imagens?.length ? (
+								<div class="mt-4 flex flex-wrap gap-3">
+									{item.imagens.map((img, index) => (
+										<figure class="overflow-hidden rounded-2xl border border-ink/10">
+											<img
+												src={img.url}
+												alt={`Foto ${index + 1} de ${item.nome}`}
+												class="aspect-[16/9] w-40 object-cover md:w-52"
+											/>
+											<figcaption class="px-2 py-1 text-[10px] uppercase tracking-wider text-ink/45">
+												{index === 0 ? 'capa' : `#${index + 1}`}
+											</figcaption>
+										</figure>
+									))}
+								</div>
+							) : item.imagemUrl ? (
 								<img
 									src={item.imagemUrl}
 									alt={`Imagem de ${item.nome}`}
 									class="mt-4 aspect-[16/9] max-w-md rounded-2xl object-cover"
 								/>
-							)
+							) : null
 						}
 
 						<details class="mt-4">
