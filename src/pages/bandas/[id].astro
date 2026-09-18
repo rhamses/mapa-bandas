@@ -81,27 +81,47 @@ const jsonLd = {
 		{
 			banda.data.fontes && banda.data.fontes.length > 0 && (
 				<section class="mt-12 border-t border-ink/10 pt-8">
-					<h2 class="text-xs uppercase tracking-[0.22em] text-ochre">Fontes</h2>
-					<ul class="mt-4 space-y-2 text-sm">
-						{banda.data.fontes.map((fonte) => (
-							<li>
+					<h2 class="text-xs uppercase tracking-[0.22em] text-ochre">Fontes e referências</h2>
+					<ol class="mt-5 grid gap-3">
+						{banda.data.fontes.map((fonte, index) => (
+							<li class="flex gap-3 rounded-2xl border border-ink/10 bg-white/50 px-4 py-3 text-sm">
+								<span class="mt-0.5 font-serif text-base text-ochre">{index + 1}.</span>
 								{fonte.url && fonte.url !== '#' ? (
-									<a class="inline-flex items-center gap-2 text-ink/70 hover:text-ochre" href={fonte.url} rel="noopener noreferrer">
-										<Icon name="lucide:external-link" class="size-3.5" />
-										{fonte.titulo}
+									<a
+										class="inline-flex min-w-0 flex-col gap-0.5 text-ink hover:text-ochre"
+										href={fonte.url}
+										rel="noopener noreferrer"
+										target="_blank"
+									>
+										<span class="inline-flex items-center gap-2 font-medium">
+											{fonte.titulo}
+											<Icon name="lucide:external-link" class="size-3.5 shrink-0" />
+										</span>
+										<span class="break-all text-xs text-ink/45">{fonte.url}</span>
 									</a>
 								) : (
-									<span class="text-ink/70">{fonte.titulo}</span>
+									<span class="text-ink/80">{fonte.titulo}</span>
 								)}
 							</li>
 						))}
-					</ul>
+					</ol>
 				</section>
 			)
 		}
 		<p class="mt-12 text-xs text-ink/40">
 			Entrada publicada em {banda.data.publicadoEm.toLocaleDateString('pt-BR', { timeZone: 'UTC' })}.
-			{banda.data.autor && <> Contribuição de {banda.data.autor}.</>}
+			{
+				banda.origem === 'submissao' ? (
+					<>
+						{' '}
+						{banda.data.creditoPublico !== false && banda.data.autor
+							? <>Contribuição de {banda.data.autor}.</>
+							: <>contribuição anônima</>}
+					</>
+				) : (
+					banda.data.autor && <> Contribuição de {banda.data.autor}.</>
+				)
+			}
 		</p>
 	</article>
 </Base>

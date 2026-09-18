@@ -4,6 +4,7 @@ import { sameOrigin } from '../../../../lib/admin-auth';
 import {
 	deleteSubmissao,
 	sanitizeId,
+	updateSubmissaoCredito,
 	updateSubmissaoStatus,
 	type SubmissaoStatus,
 } from '../../../../lib/submissoes';
@@ -28,11 +29,11 @@ export async function POST({
 	request: Request;
 }) {
 	if (!sameOrigin(request)) {
-		return html('Origem inválida.', false);
+		return html('Pedido não autorizado.', false);
 	}
 
 	const id = sanitizeId(params.id ?? '');
-	if (!id) return html('Identificador inválido.', false);
+	if (!id) return html('Contribuição inválida.', false);
 
 	const form = await request.formData();
 	const action = String(form.get('action') ?? '').trim();
@@ -45,6 +46,18 @@ export async function POST({
 			status === 'aprovada'
 				? 'Contribuição aprovada e publicada no arquivo.'
 				: 'Contribuição rejeitada.',
+			true,
+			true,
+		);
+	}
+
+	if (action === 'credito-publico' || action === 'credito-anonimo') {
+		const updated = await updateSubmissaoCredito(id, action === 'credito-publico');
+		if (!updated) return html('Contribuição não encontrada.', false);
+		return html(
+			action === 'credito-publico'
+				? 'Crédito público ativado: o nome aparece na ficha.'
+				: 'Crédito oculto: a ficha mostra contribuição anônima.',
 			true,
 			true,
 		);
