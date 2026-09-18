@@ -1,5 +1,6 @@
 import { parseMarkdown } from './markdown';
-import { listSubmissaoMarkdown } from './submissoes';
+import { isSeedId } from './seed';
+import { ensureSeedSubmissoes, listSubmissaoMarkdown } from './submissoes';
 
 export type BandaData = {
 	nome: string;
@@ -40,12 +41,6 @@ export type BandaMapa = {
 	url: string;
 	imagem?: string;
 };
-
-const seedModules = import.meta.glob('../content/bandas/*.md', {
-	eager: true,
-	query: '?raw',
-	import: 'default',
-}) as Record<string, string>;
 
 function coerceBandaData(raw: Record<string, unknown>): BandaData | null {
 	if (typeof raw.nome !== 'string' || typeof raw.cidade !== 'string') return null;
@@ -111,17 +106,6 @@ function entryFromMarkdown(id: string, markdown: string, origem: Banda['origem']
 	};
 }
 
-function loadSeedBandas(): Banda[] {
-	const bandas: Banda[] = [];
-	for (const [modulePath, markdown] of Object.entries(seedModules)) {
-		const file = modulePath.split('/').pop() ?? modulePath;
-		const id = file.replace(/\.md$/, '');
-		const entry = entryFromMarkdown(id, markdown, 'acervo');
-		if (entry) bandas.push(entry);
-	}
-	return bandas;
-}
-
 export function permalink(banda: Banda) {
 	return `/bandas/${banda.id}`;
 }
@@ -162,21 +146,17 @@ export function sortByRecentes(bandas: Banda[]) {
 export async function getBandas(): Promise<Banda[]> {
 	const byId = new Map<string, Banda>();
 
-	for (const banda of loadSeedBandas()) {
-		byId.set(banda.id, banda);
-	}
-
 	try {
+		await ensureSeedSubmissoes();
 		const submissoes = await listSubmissaoMarkdown({ statuses: ['aprovada'] });
 		for (const item of submissoes) {
-			const entry = entryFromMarkdown(item.id, item.markdown, 'submissao');
+			const origem: Banda['origem'] = isSeedId(item.id) ? 'acervo' : 'submissao';
+			const entry = entryFromMarkdown(item.id, item.markdown, origem);
 			if (!entry) continue;
-			// submissões novas não sobrescrevem o acervo canônico
-			if (byId.has(entry.id) && byId.get(entry.id)?.origem === 'acervo') continue;
 			byId.set(entry.id, entry);
 		}
 	} catch {
-		// KV/FS indisponível — segue só com o acervo
+		// KV/FS indisponível
 	}
 
 	return sortByRecentes([...byId.values()]);

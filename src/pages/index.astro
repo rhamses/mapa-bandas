@@ -10,7 +10,6 @@ import { site } from '../lib/site';
 
 const bandas = await getBandas();
 const recentes = bandas.slice(0, 8);
-const destaques = bandas.filter((banda) => banda.data.destaque).slice(0, 3);
 const jsonLd = {
 	'@context': 'https://schema.org',
 	'@type': 'CollectionPage',
@@ -64,24 +63,19 @@ const jsonLd = {
 		</div>
 	</section>
 
-	{
-		destaques.length > 0 && (
-			<section class="border-y border-ink/10 bg-ink py-16 text-paper">
-				<div class="mx-auto max-w-6xl px-4 md:px-6">
-					<p class="text-xs uppercase tracking-[0.22em] text-gold">destaques do acervo</p>
-					<div class="mt-8 grid gap-8 md:grid-cols-3">
-						{destaques.map((banda) => (
-							<a href={`/bandas/${banda.id}`} class="group">
-								<p class="text-xs uppercase tracking-[0.2em] text-paper/50">
-									{banda.data.cidade} · {banda.data.uf}
-								</p>
-								<h3 class="mt-3 font-serif text-3xl group-hover:text-gold">{banda.data.nome}</h3>
-								<p class="mt-3 text-sm leading-relaxed text-paper/70">{banda.data.resumo}</p>
-							</a>
-						))}
-					</div>
-				</div>
-			</section>
-		)
-	}
+	<section class="border-y border-ink/10 bg-ink py-16 text-paper">
+		<div class="mx-auto flex max-w-6xl flex-col items-start gap-6 px-4 md:flex-row md:items-center md:justify-between md:px-6">
+			<div>
+				<p class="text-xs uppercase tracking-[0.22em] text-gold">mapa</p>
+				<h2 class="mt-2 font-serif text-3xl tracking-tight md:text-4xl">Explore bandas pelo Brasil</h2>
+			</div>
+			<a
+				href="/mapa"
+				class="inline-flex items-center gap-2 rounded-full bg-paper px-6 py-3 text-sm font-medium text-ink transition hover:bg-gold"
+			>
+				<Icon name="lucide:map" class="size-4" />
+				Procurar no mapa
+			</a>
+		</div>
+	</section>
 </Base>
