@@ -1,8 +1,9 @@
 ---
 import { Icon } from 'astro-icon/components';
 import { PUBLIC_MAPBOX_TOKEN } from 'astro:env/client';
+import { getPublicMapboxToken } from '../lib/mapbox-token';
 
-const mapboxToken = PUBLIC_MAPBOX_TOKEN ?? '';
+const mapboxToken = getPublicMapboxToken(PUBLIC_MAPBOX_TOKEN);
 ---
 
 <div
@@ -24,6 +25,9 @@ const mapboxToken = PUBLIC_MAPBOX_TOKEN ?? '';
 		localAberto: false,
 		selecionado: null,
 		buscaTimer: null,
+		fonteDraft: '',
+		fontes: [],
+		fonteErro: '',
 		init() {
 			this.mapboxToken = this.$el.dataset.mapboxToken || '';
 		},
@@ -58,10 +62,32 @@ const mapboxToken = PUBLIC_MAPBOX_TOKEN ?? '';
 			if (form) form.reset();
 			this.artigo = '';
 			this.honeypot = '';
+			this.fonteDraft = '';
+			this.fontes = [];
+			this.fonteErro = '';
 			this.limparImagem();
 			this.limparLocalizacao();
 			const status = this.$refs.status;
 			if (status) status.innerHTML = '';
+		},
+		adicionarFonte() {
+			const value = this.fonteDraft.trim();
+			if (!value) {
+				this.fonteErro = 'Digite um link ou uma referência.';
+				this.$refs.fonteInput?.focus();
+				return;
+			}
+			if (this.fontes.some((item) => item.toLowerCase() === value.toLowerCase())) {
+				this.fonteErro = 'Essa referência já foi adicionada.';
+				return;
+			}
+			this.fontes.push(value);
+			this.fonteDraft = '';
+			this.fonteErro = '';
+			this.$nextTick(() => this.$refs.fonteInput?.focus());
+		},
+		removerFonte(index) {
+			this.fontes.splice(index, 1);
 		},
 		fecharSucesso() {
 			this.sucessoAberto = false;
@@ -187,14 +213,19 @@ const mapboxToken = PUBLIC_MAPBOX_TOKEN ?? '';
 		:aria-busy="enviando.toString()"
 		:class="enviando && 'pointer-events-none opacity-80'"
 	>
+		<label class="grid gap-2 text-sm">
+			<span>Nome da banda</span>
+			<input required name="nome" minlength="2" class="rounded-xl border border-ink/15 bg-white px-4 py-3 outline-none focus:border-ochre" />
+		</label>
+
 		<div class="grid gap-5 md:grid-cols-2">
-			<label class="grid gap-2 text-sm">
-				<span>Nome da banda</span>
-				<input required name="nome" minlength="2" class="rounded-xl border border-ink/15 bg-white px-4 py-3 outline-none focus:border-ochre" />
-			</label>
 			<label class="grid gap-2 text-sm">
 				<span>Ano de formação</span>
 				<input name="formacao" type="number" min="1900" max="2026" class="rounded-xl border border-ink/15 bg-white px-4 py-3 outline-none focus:border-ochre" />
+			</label>
+			<label class="grid gap-2 text-sm">
+				<span>Ano de encerramento <span class="font-normal text-ink/45">(opcional)</span></span>
+				<input name="encerramento" type="number" min="1900" max="2026" placeholder="Se ainda ativa, deixe em branco" class="rounded-xl border border-ink/15 bg-white px-4 py-3 outline-none focus:border-ochre" />
 			</label>
 		</div>
 
@@ -324,10 +355,46 @@ const mapboxToken = PUBLIC_MAPBOX_TOKEN ?? '';
 			<span class="text-xs text-ink/45" x-text="`${artigo.trim().length} caracteres · mínimo 80`"></span>
 		</label>
 
-		<label class="grid gap-2 text-sm">
-			<span>Fontes e links</span>
-			<textarea name="fontes" rows="3" placeholder="URLs, livros, entrevistas, acervos" class="rounded-xl border border-ink/15 bg-white px-4 py-3 outline-none focus:border-ochre"></textarea>
-		</label>
+		<div class="grid gap-2 text-sm">
+			<span class="font-medium">Fontes e links <span class="font-normal text-ink/45">(opcional)</span></span>
+			<p class="text-xs text-ink/55">Adicione uma referência por vez: link, livro, entrevista ou acervo.</p>
+			<div class="flex gap-2">
+				<input
+					x-ref="fonteInput"
+					type="text"
+					x-model="fonteDraft"
+					placeholder="https://… ou título da referência"
+					class="min-w-0 flex-1 rounded-xl border border-ink/15 bg-white px-4 py-3 outline-none focus:border-ochre"
+					@keydown.enter.prevent="adicionarFonte()"
+				/>
+				<button
+					type="button"
+					class="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl bg-ink px-4 py-3 text-sm font-medium text-paper transition hover:bg-ochre"
+					@click="adicionarFonte()"
+					aria-label="Adicionar referência"
+				>
+					<Icon name="lucide:plus" class="size-4" />
+					<span class="hidden sm:inline">Adicionar</span>
+				</button>
+			</div>
+			<p class="text-xs text-clay" x-show="fonteErro" x-cloak x-text="fonteErro"></p>
+			<ul class="grid gap-2" x-show="fontes.length" x-cloak>
+				<template x-for="(fonte, index) in fontes" :key="index">
+					<li class="flex items-start justify-between gap-3 rounded-2xl border border-ink/10 bg-white/70 px-4 py-3">
+						<span class="min-w-0 break-words text-sm text-ink/80" x-text="fonte"></span>
+						<button
+							type="button"
+							class="shrink-0 text-ink/40 transition hover:text-clay"
+							@click="removerFonte(index)"
+							aria-label="Remover referência"
+						>
+							<Icon name="lucide:trash-2" class="size-4" />
+						</button>
+						<input type="hidden" name="fonte" :value="fonte" />
+					</li>
+				</template>
+			</ul>
+		</div>
 
 		<div class="grid gap-5 md:grid-cols-2">
 			<label class="grid gap-2 text-sm">

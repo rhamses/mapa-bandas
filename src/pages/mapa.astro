@@ -2,11 +2,14 @@
 export const prerender = false;
 
 import { Icon } from 'astro-icon/components';
+import { PUBLIC_MAPBOX_TOKEN } from 'astro:env/client';
 import MapaLayout from '../layouts/Mapa.astro';
 import { getBandas, toMapaFeatures } from '../lib/bandas';
+import { getPublicMapboxToken } from '../lib/mapbox-token';
 
 const bandas = await getBandas();
 const geojson = toMapaFeatures(bandas);
+const mapboxToken = getPublicMapboxToken(PUBLIC_MAPBOX_TOKEN);
 ---
 
 <MapaLayout title="Mapa" description="Mapa em tela cheia das bandas locais do Brasil. Dê zoom para revelar os pontos e abra o arquivo de cada cidade.">
@@ -87,14 +90,18 @@ const geojson = toMapaFeatures(bandas);
 		</article>
 	</div>
 
+	<script is:inline define:vars={{ mapboxToken }}>
+		window.__MAPBOX_TOKEN__ = mapboxToken || '';
+	</script>
 	<script>
-		import { PUBLIC_MAPBOX_TOKEN } from 'astro:env/client';
 		import { initMapa } from '../scripts/mapa';
 
 		const node = document.getElementById('bandas-geojson');
-		const geojson = node ? JSON.parse(node.textContent || '{"type":"FeatureCollection","features":[]}') : { type: 'FeatureCollection', features: [] };
+		const geojson = node
+			? JSON.parse(node.textContent || '{"type":"FeatureCollection","features":[]}')
+			: { type: 'FeatureCollection', features: [] };
 		initMapa({
-			token: PUBLIC_MAPBOX_TOKEN,
+			token: window.__MAPBOX_TOKEN__ || '',
 			geojson,
 		});
 	</script>

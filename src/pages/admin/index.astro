@@ -43,7 +43,11 @@ function formatDate(iso: string) {
 			<p class="text-xs uppercase tracking-[0.22em] text-ochre">revisão</p>
 			<h1 class="mt-2 font-serif text-4xl tracking-tight md:text-5xl">Contribuições</h1>
 			<p class="mt-3 max-w-xl text-ink/65">
+<<<<<<< HEAD
 				Aprove para publicar no arquivo, rejeite ou apague envios.
+=======
+				Aprove para publicar no arquivo, rejeite ou apague envios. O crédito do autor na ficha pública é opcional.
+>>>>>>> origin/main
 			</p>
 		</div>
 		<p class="text-sm text-ink/50">{contagem.pendente} pendente{contagem.pendente === 1 ? '' : 's'}</p>
@@ -88,6 +92,9 @@ function formatDate(iso: string) {
 								<p class="mt-1 text-sm text-ink/55">
 									{item.autor ? `Por ${item.autor}` : 'Autor não informado'}
 									{item.meta.email ? ` · ${item.meta.email}` : ''}
+								</p>
+								<p class="mt-1 text-xs text-ink/45">
+									Crédito na ficha: {item.creditoPublico ? 'nome visível' : 'contribuição anônima'}
 								</p>
 							</div>
 							<span
@@ -147,6 +154,31 @@ function formatDate(iso: string) {
 										hx-swap="innerHTML"
 									>
 										Rejeitar
+									</button>
+								)
+							}
+							{
+								item.creditoPublico ? (
+									<button
+										type="button"
+										class="rounded-full border border-ink/15 px-4 py-2 text-sm transition hover:border-ochre hover:text-ochre"
+										hx-post={`/api/admin/submissoes/${item.id}`}
+										hx-vals='{"action":"credito-anonimo"}'
+										hx-target="#admin-flash"
+										hx-swap="innerHTML"
+									>
+										Ocultar crédito
+									</button>
+								) : (
+									<button
+										type="button"
+										class="rounded-full border border-ink/15 px-4 py-2 text-sm transition hover:border-ochre hover:text-ochre"
+										hx-post={`/api/admin/submissoes/${item.id}`}
+										hx-vals='{"action":"credito-publico"}'
+										hx-target="#admin-flash"
+										hx-swap="innerHTML"
+									>
+										Mostrar crédito
 									</button>
 								)
 							}
