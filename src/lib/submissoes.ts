@@ -3,6 +3,7 @@ import path from 'node:path';
 import { Buffer } from 'node:buffer';
 import { env } from 'cloudflare:workers';
 import { buildMarkdownFile, parseMarkdown } from './markdown';
+import { isSeedId, listSeedMarkdown } from './seed';
 
 const ROOT = path.join(process.cwd(), 'data', 'submissoes');
 const IMAGENS = path.join(ROOT, 'imagens');
@@ -11,6 +12,7 @@ const MD_PREFIX = 'md:';
 const IMG_PREFIX = 'img:';
 const META_PREFIX = 'img-meta:';
 const RECORD_META_PREFIX = 'meta:';
+const SEED_DONE_PREFIX = 'seed-done:';
 
 export type ImagemMeta = {
 	contentType: string;
@@ -200,6 +202,7 @@ export async function saveSubmissao(options: {
 			email,
 			savedAt: new Date().toISOString(),
 			status,
+			reviewedAt: status === 'aprovada' || status === 'rejeitada' ? new Date().toISOString() : undefined,
 			creditoPublico: true,
 		} satisfies SubmissaoMeta),
 	);
@@ -261,7 +264,29 @@ export async function listSubmissaoMarkdown(options?: {
 		.sort((a, b) => b.meta.savedAt.localeCompare(a.meta.savedAt));
 }
 
+/** Importa o acervo seed como submissões aprovadas (uma vez por id). */
+export async function ensureSeedSubmissoes() {
+	for (const { id, markdown } of listSeedMarkdown()) {
+		const doneKey = `${SEED_DONE_PREFIX}${id}`;
+		const alreadyDone = await env.SUBMISSOES.get(doneKey);
+		if (alreadyDone) continue;
+
+		const existing = await env.SUBMISSOES.get(`${MD_PREFIX}${id}`);
+		if (!existing) {
+			await saveSubmissao({
+				id,
+				markdown,
+				email: 'seed@mapa-bandas.local',
+				status: 'aprovada',
+			});
+		}
+
+		await env.SUBMISSOES.put(doneKey, '1');
+	}
+}
+
 export async function listSubmissoesAdmin(): Promise<SubmissaoRecord[]> {
+	await ensureSeedSubmissoes();
 	const items = await listSubmissaoMarkdown();
 	return items.map((item) => summarizeMarkdown(item.id, item.markdown, item.meta));
 }
@@ -337,6 +362,10 @@ export async function deleteSubmissao(id: string) {
 	await env.SUBMISSOES.delete(`${RECORD_META_PREFIX}${safeId}`);
 	await env.SUBMISSOES.delete(`${IMG_PREFIX}${safeId}`);
 	await env.SUBMISSOES.delete(`${META_PREFIX}${safeId}`);
+	// Impede reimportação automática do seed após exclusão no admin
+	if (isSeedId(safeId)) {
+		await env.SUBMISSOES.put(`${SEED_DONE_PREFIX}${safeId}`, '1');
+	}
 
 	const ext = record.imagemUrl?.split('.').pop();
 	await tryDeleteDisk(safeId, ext);
