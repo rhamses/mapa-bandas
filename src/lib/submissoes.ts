@@ -1,18 +1,8 @@
-import { mkdir, readdir, readFile, unlink, writeFile } from 'node:fs/promises';
-import path from 'node:path';
-import { Buffer } from 'node:buffer';
 import { env } from 'cloudflare:workers';
 import { buildMarkdownFile, parseMarkdown } from './markdown';
 import { isSeedId, listSeedMarkdown } from './seed';
 
-const ROOT = path.join(process.cwd(), 'data', 'submissoes');
-const IMAGENS = path.join(ROOT, 'imagens');
-
-const MD_PREFIX = 'md:';
-const IMG_PREFIX = 'img:';
-const META_PREFIX = 'img-meta:';
-const RECORD_META_PREFIX = 'meta:';
-const SEED_DONE_PREFIX = 'seed-done:';
+const R2_PREFIX = 'mapa-bandas/submissoes';
 
 export type ImagemMeta = {
 	contentType: string;
@@ -31,6 +21,15 @@ export type SubmissaoMeta = {
 	creditoPublico?: boolean;
 };
 
+export type ImagemRecord = {
+	posicao: number;
+	url: string;
+	contentType: string;
+	filename: string;
+	ext: string;
+	r2Key: string;
+};
+
 export type SavedSubmissao = {
 	id: string;
 	markdown: string;
@@ -46,126 +45,81 @@ export type SubmissaoRecord = {
 	uf: string;
 	autor?: string;
 	resumo?: string;
+	/** Capa (primeira foto). */
 	imagemUrl?: string;
+	imagens: ImagemRecord[];
 	creditoPublico: boolean;
 };
 
-async function tryWriteDisk(options: {
+type SubmissaoRow = {
 	id: string;
 	markdown: string;
-	imagem?: { bytes: Uint8Array; meta: ImagemMeta } | null;
-}) {
-	try {
-		await mkdir(IMAGENS, { recursive: true });
-		await writeFile(path.join(ROOT, `${options.id}.md`), options.markdown, 'utf8');
-		if (options.imagem) {
-			await writeFile(
-				path.join(IMAGENS, `${options.id}.${options.imagem.meta.ext}`),
-				options.imagem.bytes,
-			);
-		}
-		return true;
-	} catch {
-		return false;
-	}
+	email: string | null;
+	status: string;
+	saved_at: string;
+	reviewed_at: string | null;
+	credito_publico: number;
+};
+
+type ImagemRow = {
+	posicao: number;
+	r2_key: string;
+	content_type: string;
+	filename: string;
+	ext: string;
+};
+
+function mediaUrl(id: string, posicao: number, ext: string) {
+	return `/media/submissoes/${id}/${posicao}.${ext}`;
 }
 
-async function tryDeleteDisk(id: string, imagemExt?: string) {
-	try {
-		await unlink(path.join(ROOT, `${id}.md`));
-	} catch {
-		// ignore
-	}
-	if (imagemExt) {
-		try {
-			await unlink(path.join(IMAGENS, `${id}.${imagemExt}`));
-		} catch {
-			// ignore
-		}
-	}
-	try {
-		const files = await readdir(IMAGENS);
-		for (const file of files) {
-			if (file.startsWith(`${id}.`)) {
-				try {
-					await unlink(path.join(IMAGENS, file));
-				} catch {
-					// ignore
-				}
-			}
-		}
-	} catch {
-		// ignore
-	}
+function r2Key(id: string, posicao: number, ext: string) {
+	return `${R2_PREFIX}/${id}/${posicao}.${ext}`;
 }
 
-async function mirrorViaDevServer(options: {
-	id: string;
-	markdown: string;
-	imagem?: { bytes: Uint8Array; meta: ImagemMeta } | null;
-	origin?: string;
-}) {
-	if (!options.origin) return;
-	try {
-		await fetch(new URL('/__dev/mirror-submissao', options.origin), {
-			method: 'POST',
-			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({
-				id: options.id,
-				markdown: options.markdown,
-				imagem: options.imagem
-					? {
-							meta: options.imagem.meta,
-							base64: Buffer.from(options.imagem.bytes).toString('base64'),
-						}
-					: null,
-			}),
-		});
-	} catch {
-		// espelho só existe no astro dev
-	}
+function rowToMeta(row: SubmissaoRow): SubmissaoMeta {
+	const status = row.status;
+	return {
+		email: row.email ?? undefined,
+		savedAt: row.saved_at,
+		status:
+			status === 'pendente' || status === 'aprovada' || status === 'rejeitada'
+				? status
+				: 'aprovada',
+		reviewedAt: row.reviewed_at ?? undefined,
+		creditoPublico: row.credito_publico !== 0,
+	};
 }
 
-function normalizeMeta(raw: string | null, fallbackSavedAt?: string): SubmissaoMeta {
-	if (!raw) {
-		return {
-			savedAt: fallbackSavedAt ?? new Date(0).toISOString(),
-			status: 'aprovada',
-			creditoPublico: true,
-		};
-	}
-	try {
-		const parsed = JSON.parse(raw) as Partial<SubmissaoMeta>;
-		const status = parsed.status;
-		return {
-			email: typeof parsed.email === 'string' ? parsed.email : undefined,
-			savedAt:
-				typeof parsed.savedAt === 'string'
-					? parsed.savedAt
-					: (fallbackSavedAt ?? new Date(0).toISOString()),
-			status:
-				status === 'pendente' || status === 'aprovada' || status === 'rejeitada'
-					? status
-					: 'aprovada',
-			reviewedAt: typeof parsed.reviewedAt === 'string' ? parsed.reviewedAt : undefined,
-			creditoPublico: parsed.creditoPublico === false ? false : true,
-		};
-	} catch {
-		return {
-			savedAt: fallbackSavedAt ?? new Date(0).toISOString(),
-			status: 'aprovada',
-			creditoPublico: true,
-		};
-	}
+async function listImagens(submissaoId: string): Promise<ImagemRecord[]> {
+	const { results } = await env.DB.prepare(
+		`SELECT posicao, r2_key, content_type, filename, ext
+     FROM mb_imagens WHERE submissao_id = ? ORDER BY posicao ASC`,
+	)
+		.bind(submissaoId)
+		.all<ImagemRow>();
+
+	return (results ?? []).map((row) => ({
+		posicao: row.posicao,
+		url: mediaUrl(submissaoId, row.posicao, row.ext),
+		contentType: row.content_type,
+		filename: row.filename,
+		ext: row.ext,
+		r2Key: row.r2_key,
+	}));
 }
 
-function summarizeMarkdown(id: string, markdown: string, meta: SubmissaoMeta): SubmissaoRecord {
+function summarizeMarkdown(
+	id: string,
+	markdown: string,
+	meta: SubmissaoMeta,
+	imagens: ImagemRecord[],
+): SubmissaoRecord {
 	const parsed = parseMarkdown(markdown);
 	const data = parsed.data;
-	const imagem =
-		typeof data.imagem === 'string' && data.imagem
-			? data.imagem
-			: undefined;
+	const capa =
+		imagens[0]?.url ??
+		(typeof data.imagem === 'string' && data.imagem ? data.imagem : undefined);
 	const fromFrontmatter =
 		data.creditoPublico === false ? false : data.creditoPublico === true ? true : undefined;
 
@@ -178,7 +132,8 @@ function summarizeMarkdown(id: string, markdown: string, meta: SubmissaoMeta): S
 		uf: typeof data.uf === 'string' ? data.uf : '',
 		autor: typeof data.autor === 'string' ? data.autor : undefined,
 		resumo: typeof data.resumo === 'string' ? data.resumo : undefined,
-		imagemUrl: imagem,
+		imagemUrl: capa,
+		imagens,
 		creditoPublico: fromFrontmatter ?? meta.creditoPublico !== false,
 	};
 }
@@ -187,39 +142,61 @@ export async function saveSubmissao(options: {
 	id: string;
 	markdown: string;
 	email?: string;
+	imagens?: Array<{ bytes: Uint8Array; meta: ImagemMeta }>;
+	/** @deprecated use imagens */
 	imagem?: { bytes: Uint8Array; meta: ImagemMeta } | null;
-	origin?: string;
 	status?: SubmissaoStatus;
 	savedAt?: string;
 }): Promise<SavedSubmissao> {
-	const { id, markdown, email, imagem, origin } = options;
-	let imagemPath: string | undefined;
+	const { id, markdown, email } = options;
 	const status = options.status ?? 'pendente';
 	const savedAt = options.savedAt ?? new Date().toISOString();
+	const imagens =
+		options.imagens ??
+		(options.imagem ? [options.imagem] : []);
 
-	await env.SUBMISSOES.put(`${MD_PREFIX}${id}`, markdown);
-	await env.SUBMISSOES.put(
-		`${RECORD_META_PREFIX}${id}`,
-		JSON.stringify({
-			email,
-			savedAt,
+	await env.DB.prepare(
+		`INSERT INTO mb_submissoes (id, markdown, email, status, saved_at, reviewed_at, credito_publico)
+     VALUES (?, ?, ?, ?, ?, ?, 1)
+     ON CONFLICT(id) DO UPDATE SET
+       markdown = excluded.markdown,
+       email = excluded.email,
+       status = excluded.status,
+       saved_at = excluded.saved_at,
+       reviewed_at = excluded.reviewed_at,
+       credito_publico = excluded.credito_publico`,
+	)
+		.bind(
+			id,
+			markdown,
+			email ?? null,
 			status,
-			reviewedAt: status === 'aprovada' || status === 'rejeitada' ? savedAt : undefined,
-			creditoPublico: true,
-		} satisfies SubmissaoMeta),
-	);
+			savedAt,
+			status === 'aprovada' || status === 'rejeitada' ? savedAt : null,
+		)
+		.run();
 
-	if (imagem) {
-		await env.SUBMISSOES.put(`${IMG_PREFIX}${id}`, imagem.bytes, {
-			metadata: imagem.meta,
+	let imagemPath: string | undefined;
+
+	for (let i = 0; i < imagens.length; i++) {
+		const item = imagens[i]!;
+		const key = r2Key(id, i, item.meta.ext);
+		await env.MEDIA.put(key, item.bytes, {
+			httpMetadata: { contentType: item.meta.contentType },
+			customMetadata: { filename: item.meta.filename },
 		});
-		await env.SUBMISSOES.put(`${META_PREFIX}${id}`, JSON.stringify(imagem.meta));
-		imagemPath = `/media/submissoes/${id}.${imagem.meta.ext}`;
-	}
-
-	const wrote = await tryWriteDisk({ id, markdown, imagem });
-	if (!wrote) {
-		await mirrorViaDevServer({ id, markdown, imagem, origin });
+		await env.DB.prepare(
+			`INSERT INTO mb_imagens (submissao_id, posicao, r2_key, content_type, filename, ext)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT(submissao_id, posicao) DO UPDATE SET
+         r2_key = excluded.r2_key,
+         content_type = excluded.content_type,
+         filename = excluded.filename,
+         ext = excluded.ext`,
+		)
+			.bind(id, i, key, item.meta.contentType, item.meta.filename, item.meta.ext)
+			.run();
+		if (i === 0) imagemPath = mediaUrl(id, 0, item.meta.ext);
 	}
 
 	return { id, markdown, imagemPath };
@@ -228,46 +205,27 @@ export async function saveSubmissao(options: {
 export async function listSubmissaoMarkdown(options?: {
 	statuses?: SubmissaoStatus[];
 }): Promise<Array<{ id: string; markdown: string; meta: SubmissaoMeta }>> {
-	const byId = new Map<string, { markdown: string; meta: SubmissaoMeta }>();
-	const allowed = options?.statuses ? new Set(options.statuses) : null;
+	const allowed = options?.statuses;
+	let sql = `SELECT id, markdown, email, status, saved_at, reviewed_at, credito_publico
+    FROM mb_submissoes`;
+	const binds: string[] = [];
 
-	try {
-		const files = await readdir(ROOT);
-		for (const file of files) {
-			if (!file.endsWith('.md')) continue;
-			const id = file.replace(/\.md$/, '');
-			const markdown = await readFile(path.join(ROOT, file), 'utf8');
-			const metaRaw = await env.SUBMISSOES.get(`${RECORD_META_PREFIX}${id}`);
-			const meta = normalizeMeta(metaRaw, guessSavedAtFromId(id));
-			byId.set(id, { markdown, meta });
-		}
-	} catch {
-		// pasta ainda inexistente ou FS indisponível no Worker
+	if (allowed?.length) {
+		sql += ` WHERE status IN (${allowed.map(() => '?').join(',')})`;
+		binds.push(...allowed);
 	}
+	sql += ` ORDER BY saved_at DESC, id DESC`;
 
-	let cursor: string | undefined;
-	do {
-		const page = await env.SUBMISSOES.list({ prefix: MD_PREFIX, cursor });
-		for (const key of page.keys) {
-			const id = key.name.slice(MD_PREFIX.length);
-			if (byId.has(id)) continue;
-			const value = await env.SUBMISSOES.get(key.name);
-			if (!value) continue;
-			const metaRaw = await env.SUBMISSOES.get(`${RECORD_META_PREFIX}${id}`);
-			const meta = normalizeMeta(metaRaw, guessSavedAtFromId(id));
-			byId.set(id, { markdown: value, meta });
-		}
-		cursor = page.list_complete ? undefined : page.cursor;
-	} while (cursor);
+	const stmt = env.DB.prepare(sql);
+	const { results } = binds.length
+		? await stmt.bind(...binds).all<SubmissaoRow>()
+		: await stmt.all<SubmissaoRow>();
 
-	return [...byId.entries()]
-		.map(([id, item]) => ({ id, markdown: item.markdown, meta: item.meta }))
-		.filter((item) => (allowed ? allowed.has(item.meta.status) : true))
-		.sort((a, b) => {
-			const byDate = b.meta.savedAt.localeCompare(a.meta.savedAt);
-			if (byDate !== 0) return byDate;
-			return b.id.localeCompare(a.id);
-		});
+	return (results ?? []).map((row) => ({
+		id: row.id,
+		markdown: row.markdown,
+		meta: rowToMeta(row),
+	}));
 }
 
 function savedAtFromMarkdown(markdown: string, fallbackId: string) {
@@ -280,12 +238,30 @@ function savedAtFromMarkdown(markdown: string, fallbackId: string) {
 	return guessSavedAtFromId(fallbackId);
 }
 
+async function metaGet(key: string) {
+	const row = await env.DB.prepare(`SELECT value FROM mb_meta WHERE key = ?`)
+		.bind(key)
+		.first<{ value: string }>();
+	return row?.value ?? null;
+}
+
+async function metaPut(key: string, value: string) {
+	await env.DB.prepare(
+		`INSERT INTO mb_meta (key, value) VALUES (?, ?)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+	)
+		.bind(key, value)
+		.run();
+}
+
 /** Importa o acervo seed como submissões aprovadas (uma vez por id). */
 export async function ensureSeedSubmissoes() {
 	for (const { id, markdown } of listSeedMarkdown()) {
-		const doneKey = `${SEED_DONE_PREFIX}${id}`;
-		const alreadyDone = await env.SUBMISSOES.get(doneKey);
-		const existing = await env.SUBMISSOES.get(`${MD_PREFIX}${id}`);
+		const doneKey = `seed-done:${id}`;
+		const alreadyDone = await metaGet(doneKey);
+		const existing = await env.DB.prepare(`SELECT id FROM mb_submissoes WHERE id = ?`)
+			.bind(id)
+			.first();
 		const seedSavedAt = savedAtFromMarkdown(markdown, id);
 
 		if (!existing) {
@@ -297,73 +273,69 @@ export async function ensureSeedSubmissoes() {
 				savedAt: seedSavedAt,
 			});
 		} else if (!alreadyDone) {
-			// Já existia no KV sem marcador: só alinha a data ao frontmatter do seed
-			const metaRaw = await env.SUBMISSOES.get(`${RECORD_META_PREFIX}${id}`);
-			const meta = normalizeMeta(metaRaw, seedSavedAt);
-			await env.SUBMISSOES.put(
-				`${RECORD_META_PREFIX}${id}`,
-				JSON.stringify({ ...meta, savedAt: seedSavedAt, email: meta.email ?? 'seed@mapa-bandas.local' }),
-			);
+			await env.DB.prepare(
+				`UPDATE mb_submissoes SET saved_at = ?, email = COALESCE(email, ?) WHERE id = ?`,
+			)
+				.bind(seedSavedAt, 'seed@mapa-bandas.local', id)
+				.run();
 		}
 
-		if (!alreadyDone) {
-			await env.SUBMISSOES.put(doneKey, '1');
-		}
+		if (!alreadyDone) await metaPut(doneKey, '1');
 	}
 
-	// Repara datas de seed já importadas com timestamp de deploy (v1)
-	const datesKey = 'seed-dates:v1';
-	if (!(await env.SUBMISSOES.get(datesKey))) {
+	if (!(await metaGet('seed-dates:v1'))) {
 		for (const { id, markdown } of listSeedMarkdown()) {
-			const metaRaw = await env.SUBMISSOES.get(`${RECORD_META_PREFIX}${id}`);
-			if (!metaRaw) continue;
-			const meta = normalizeMeta(metaRaw, savedAtFromMarkdown(markdown, id));
 			const seedSavedAt = savedAtFromMarkdown(markdown, id);
-			await env.SUBMISSOES.put(
-				`${RECORD_META_PREFIX}${id}`,
-				JSON.stringify({ ...meta, savedAt: seedSavedAt }),
-			);
+			await env.DB.prepare(`UPDATE mb_submissoes SET saved_at = ? WHERE id = ?`)
+				.bind(seedSavedAt, id)
+				.run();
 		}
-		await env.SUBMISSOES.put(datesKey, '1');
+		await metaPut('seed-dates:v1', '1');
 	}
 }
 
 export async function listSubmissoesAdmin(): Promise<SubmissaoRecord[]> {
 	await ensureSeedSubmissoes();
 	const items = await listSubmissaoMarkdown();
-	return items.map((item) => summarizeMarkdown(item.id, item.markdown, item.meta));
+	const out: SubmissaoRecord[] = [];
+	for (const item of items) {
+		const imagens = await listImagens(item.id);
+		out.push(summarizeMarkdown(item.id, item.markdown, item.meta, imagens));
+	}
+	return out;
 }
 
 export async function getSubmissaoRecord(id: string): Promise<SubmissaoRecord | null> {
 	const safeId = sanitizeId(id);
 	if (!safeId) return null;
 
-	let markdown = await env.SUBMISSOES.get(`${MD_PREFIX}${safeId}`);
-	if (!markdown) {
-		try {
-			markdown = await readFile(path.join(ROOT, `${safeId}.md`), 'utf8');
-		} catch {
-			return null;
-		}
-	}
+	const row = await env.DB.prepare(
+		`SELECT id, markdown, email, status, saved_at, reviewed_at, credito_publico
+     FROM mb_submissoes WHERE id = ?`,
+	)
+		.bind(safeId)
+		.first<SubmissaoRow>();
+	if (!row) return null;
 
-	const metaRaw = await env.SUBMISSOES.get(`${RECORD_META_PREFIX}${safeId}`);
-	const meta = normalizeMeta(metaRaw, guessSavedAtFromId(safeId));
-	return summarizeMarkdown(safeId, markdown, meta);
+	const imagens = await listImagens(safeId);
+	return summarizeMarkdown(safeId, row.markdown, rowToMeta(row), imagens);
 }
 
 export async function updateSubmissaoStatus(id: string, status: SubmissaoStatus) {
 	const record = await getSubmissaoRecord(id);
 	if (!record) return null;
 
-	const next: SubmissaoMeta = {
-		...record.meta,
-		status,
-		reviewedAt: new Date().toISOString(),
-		creditoPublico: record.meta.creditoPublico !== false,
+	const reviewedAt = new Date().toISOString();
+	await env.DB.prepare(
+		`UPDATE mb_submissoes SET status = ?, reviewed_at = ? WHERE id = ?`,
+	)
+		.bind(status, reviewedAt, record.id)
+		.run();
+
+	return {
+		...record,
+		meta: { ...record.meta, status, reviewedAt, creditoPublico: record.meta.creditoPublico !== false },
 	};
-	await env.SUBMISSOES.put(`${RECORD_META_PREFIX}${record.id}`, JSON.stringify(next));
-	return { ...record, meta: next };
 }
 
 export async function updateSubmissaoCredito(id: string, creditoPublico: boolean) {
@@ -379,21 +351,18 @@ export async function updateSubmissaoCredito(id: string, creditoPublico: boolean
 		parsed.body,
 	);
 
-	await env.SUBMISSOES.put(`${MD_PREFIX}${record.id}`, nextMarkdown);
-	const nextMeta: SubmissaoMeta = {
-		...record.meta,
-		creditoPublico,
-	};
-	await env.SUBMISSOES.put(`${RECORD_META_PREFIX}${record.id}`, JSON.stringify(nextMeta));
+	await env.DB.prepare(
+		`UPDATE mb_submissoes SET markdown = ?, credito_publico = ? WHERE id = ?`,
+	)
+		.bind(nextMarkdown, creditoPublico ? 1 : 0, record.id)
+		.run();
 
-	try {
-		await mkdir(ROOT, { recursive: true });
-		await writeFile(path.join(ROOT, `${record.id}.md`), nextMarkdown, 'utf8');
-	} catch {
-		// FS indisponível no Worker
-	}
-
-	return summarizeMarkdown(record.id, nextMarkdown, nextMeta);
+	return summarizeMarkdown(
+		record.id,
+		nextMarkdown,
+		{ ...record.meta, creditoPublico },
+		record.imagens,
+	);
 }
 
 export async function deleteSubmissao(id: string) {
@@ -401,62 +370,51 @@ export async function deleteSubmissao(id: string) {
 	if (!record) return false;
 
 	const safeId = record.id;
-	await env.SUBMISSOES.delete(`${MD_PREFIX}${safeId}`);
-	await env.SUBMISSOES.delete(`${RECORD_META_PREFIX}${safeId}`);
-	await env.SUBMISSOES.delete(`${IMG_PREFIX}${safeId}`);
-	await env.SUBMISSOES.delete(`${META_PREFIX}${safeId}`);
-	// Impede reimportação automática do seed após exclusão no admin
-	if (isSeedId(safeId)) {
-		await env.SUBMISSOES.put(`${SEED_DONE_PREFIX}${safeId}`, '1');
-	}
-
-	const ext = record.imagemUrl?.split('.').pop();
-	await tryDeleteDisk(safeId, ext);
-	return true;
-}
-
-export async function getSubmissaoImagem(id: string): Promise<{
-	bytes: Uint8Array;
-	meta: ImagemMeta;
-} | null> {
-	const metaRaw = await env.SUBMISSOES.get(`${META_PREFIX}${id}`);
-	const meta = metaRaw ? (JSON.parse(metaRaw) as ImagemMeta) : null;
-
-	if (meta) {
+	for (const img of record.imagens) {
 		try {
-			const bytes = await readFile(path.join(IMAGENS, `${id}.${meta.ext}`));
-			return { bytes: new Uint8Array(bytes), meta };
-		} catch {
-			// cai no KV
-		}
-	}
-
-	const stored = await env.SUBMISSOES.get(`${IMG_PREFIX}${id}`, 'arrayBuffer');
-	if (!stored) {
-		try {
-			const files = await readdir(IMAGENS);
-			const match = files.find((f) => f.startsWith(`${id}.`));
-			if (match) {
-				const ext = match.split('.').pop() ?? 'bin';
-				const bytes = await readFile(path.join(IMAGENS, match));
-				return {
-					bytes: new Uint8Array(bytes),
-					meta: { contentType: contentTypeForExt(ext), filename: match, ext },
-				};
-			}
+			await env.MEDIA.delete(img.r2Key);
 		} catch {
 			// ignore
 		}
-		return null;
 	}
 
-	const fallbackMeta: ImagemMeta = meta ?? {
-		contentType: 'application/octet-stream',
-		filename: id,
-		ext: 'bin',
-	};
+	await env.DB.prepare(`DELETE FROM mb_imagens WHERE submissao_id = ?`).bind(safeId).run();
+	await env.DB.prepare(`DELETE FROM mb_submissoes WHERE id = ?`).bind(safeId).run();
 
-	return { bytes: new Uint8Array(stored), meta: fallbackMeta };
+	if (isSeedId(safeId)) {
+		await metaPut(`seed-done:${safeId}`, '1');
+	}
+	return true;
+}
+
+export async function getSubmissaoImagem(
+	id: string,
+	posicao = 0,
+): Promise<{ bytes: Uint8Array; meta: ImagemMeta } | null> {
+	const safeId = sanitizeId(id);
+	if (!safeId) return null;
+
+	const row = await env.DB.prepare(
+		`SELECT r2_key, content_type, filename, ext FROM mb_imagens
+     WHERE submissao_id = ? AND posicao = ?`,
+	)
+		.bind(safeId, posicao)
+		.first<ImagemRow>();
+
+	if (!row) return null;
+
+	const obj = await env.MEDIA.get(row.r2_key);
+	if (!obj) return null;
+
+	const buf = await obj.arrayBuffer();
+	return {
+		bytes: new Uint8Array(buf),
+		meta: {
+			contentType: row.content_type,
+			filename: row.filename,
+			ext: row.ext,
+		},
+	};
 }
 
 export function contentTypeForExt(ext: string) {

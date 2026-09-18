@@ -13,8 +13,7 @@ const mapboxToken = getPublicMapboxToken(PUBLIC_MAPBOX_TOKEN);
 		mapboxToken: '',
 		artigo: '',
 		honeypot: '',
-		imagemNome: '',
-		imagemPreview: '',
+		imagens: [],
 		enviando: false,
 		sucessoAberto: false,
 		sucessoMensagem: '',
@@ -31,23 +30,45 @@ const mapboxToken = getPublicMapboxToken(PUBLIC_MAPBOX_TOKEN);
 		init() {
 			this.mapboxToken = this.$el.dataset.mapboxToken || '';
 		},
-		onImagem(event) {
-			const file = event.target.files?.[0];
-			if (this.imagemPreview) URL.revokeObjectURL(this.imagemPreview);
-			if (!file) {
-				this.imagemNome = '';
-				this.imagemPreview = '';
-				return;
+		syncImagensInput() {
+			const input = this.$refs.imagemInput;
+			if (!input) return;
+			const dt = new DataTransfer();
+			for (const item of this.imagens) {
+				if (item.file) dt.items.add(item.file);
 			}
-			this.imagemNome = file.name;
-			this.imagemPreview = URL.createObjectURL(file);
+			input.files = dt.files;
 		},
-		limparImagem() {
+		onImagens(event) {
+			const files = Array.from(event.target.files || []);
+			for (const file of files) {
+				if (this.imagens.length >= 8) break;
+				this.imagens.push({
+					name: file.name,
+					preview: URL.createObjectURL(file),
+					file,
+				});
+			}
+			this.syncImagensInput();
+		},
+		tornarCapa(index) {
+			if (index <= 0) return;
+			const [item] = this.imagens.splice(index, 1);
+			this.imagens.unshift(item);
+			this.syncImagensInput();
+		},
+		removerImagem(index) {
+			const [item] = this.imagens.splice(index, 1);
+			if (item?.preview) URL.revokeObjectURL(item.preview);
+			this.syncImagensInput();
+		},
+		limparImagens() {
+			for (const item of this.imagens) {
+				if (item.preview) URL.revokeObjectURL(item.preview);
+			}
+			this.imagens = [];
 			const input = this.$refs.imagemInput;
 			if (input) input.value = '';
-			if (this.imagemPreview) URL.revokeObjectURL(this.imagemPreview);
-			this.imagemNome = '';
-			this.imagemPreview = '';
 		},
 		limparLocalizacao() {
 			this.localQuery = '';
@@ -65,7 +86,7 @@ const mapboxToken = getPublicMapboxToken(PUBLIC_MAPBOX_TOKEN);
 			this.fonteDraft = '';
 			this.fontes = [];
 			this.fonteErro = '';
-			this.limparImagem();
+			this.limparImagens();
 			this.limparLocalizacao();
 			const status = this.$refs.status;
 			if (status) status.innerHTML = '';
@@ -78,7 +99,7 @@ const mapboxToken = getPublicMapboxToken(PUBLIC_MAPBOX_TOKEN);
 				return;
 			}
 			if (this.fontes.some((item) => item.toLowerCase() === value.toLowerCase())) {
-				this.fonteErro = 'Essa referência já foi adicionada.';
+				this.fonteErro = 'Essa referência já está na lista.';
 				return;
 			}
 			this.fontes.push(value);
@@ -301,43 +322,74 @@ const mapboxToken = getPublicMapboxToken(PUBLIC_MAPBOX_TOKEN);
 		</label>
 
 		<div class="grid gap-2 text-sm">
-			<span class="font-medium">Imagem da banda</span>
-			<label
-				class="relative grid cursor-pointer place-items-center gap-3 overflow-hidden rounded-2xl border-2 border-dashed border-ochre/50 bg-ochre/5 px-4 py-8 text-center transition hover:border-ochre hover:bg-ochre/10"
-				:class="imagemPreview && 'border-solid border-ochre/30 bg-white p-0'"
+			<span class="font-medium">Fotos da banda</span>
+			<p class="text-xs text-ink/55">
+				A primeira foto é a capa no arquivo. Você pode enviar até 8 imagens (JPG, PNG, WebP ou GIF · 5 MB cada).
+			</p>
+			<input
+				x-ref="imagemInput"
+				name="imagens"
+				type="file"
+				accept="image/jpeg,image/png,image/webp,image/gif"
+				multiple
+				class="sr-only"
+				@change="onImagens($event)"
+			/>
+			<button
+				type="button"
+				class="grid w-full cursor-pointer place-items-center gap-3 rounded-2xl border-2 border-dashed border-ochre/50 bg-ochre/5 px-4 py-8 text-center transition hover:border-ochre hover:bg-ochre/10"
+				@click="$refs.imagemInput?.click()"
 			>
-				<input
-					x-ref="imagemInput"
-					name="imagem"
-					type="file"
-					accept="image/jpeg,image/png,image/webp,image/gif"
-					class="sr-only"
-					@change="onImagem($event)"
-				/>
-				<template x-if="!imagemPreview">
-					<span class="grid place-items-center gap-2">
-						<span class="grid size-12 place-items-center rounded-full bg-ochre text-paper">
-							<Icon name="lucide:image-plus" class="size-6" />
-						</span>
-						<span class="text-base font-medium text-ink">Clique para escolher uma imagem</span>
-						<span class="text-xs text-ink/55">JPG, PNG, WebP ou GIF · até 5 MB</span>
+				<span class="grid place-items-center gap-2">
+					<span class="grid size-12 place-items-center rounded-full bg-ochre text-paper">
+						<Icon name="lucide:image-plus" class="size-6" />
 					</span>
-				</template>
-				<template x-if="imagemPreview">
-					<span class="relative block w-full">
-						<img :src="imagemPreview" alt="Pré-visualização da imagem" class="aspect-[16/9] w-full object-cover" />
-						<span class="absolute inset-x-0 bottom-0 bg-ink/70 px-3 py-2 text-left text-xs text-paper" x-text="imagemNome"></span>
-					</span>
-				</template>
-			</label>
+					<span class="text-base font-medium text-ink">Adicionar fotos</span>
+					<span class="text-xs text-ink/55" x-text="imagens.length ? `${imagens.length} selecionada(s)` : 'Nenhuma foto ainda'"></span>
+				</span>
+			</button>
+			<template x-if="imagens.length">
+				<ul class="mt-2 grid gap-3 sm:grid-cols-2">
+					<template x-for="(item, index) in imagens" :key="item.preview">
+						<li class="overflow-hidden rounded-2xl border border-ink/10 bg-white">
+							<div class="relative">
+								<img :src="item.preview" :alt="item.name" class="aspect-[16/9] w-full object-cover" />
+								<span
+									class="absolute left-2 top-2 rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wider"
+									:class="index === 0 ? 'bg-ochre text-paper' : 'bg-ink/70 text-paper'"
+									x-text="index === 0 ? 'capa' : `#${index + 1}`"
+								></span>
+							</div>
+							<div class="flex flex-wrap items-center gap-2 px-3 py-2">
+								<span class="min-w-0 flex-1 truncate text-xs text-ink/60" x-text="item.name"></span>
+								<button
+									type="button"
+									class="text-xs text-ochre underline-offset-2 hover:underline"
+									x-show="index !== 0"
+									@click="tornarCapa(index)"
+								>
+									Usar como capa
+								</button>
+								<button
+									type="button"
+									class="text-xs text-clay underline-offset-2 hover:underline"
+									@click="removerImagem(index)"
+								>
+									Remover
+								</button>
+							</div>
+						</li>
+					</template>
+				</ul>
+			</template>
 			<button
 				type="button"
 				class="justify-self-start text-xs text-ochre underline-offset-2 hover:underline"
-				x-show="imagemPreview"
+				x-show="imagens.length"
 				x-cloak
-				@click="limparImagem()"
+				@click="limparImagens()"
 			>
-				Remover imagem
+				Remover todas as fotos
 			</button>
 		</div>
 
