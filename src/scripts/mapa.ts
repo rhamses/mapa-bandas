@@ -17,6 +17,7 @@ declare global {
 	interface Window {
 		Alpine: AlpineWithModal;
 		htmx: unknown;
+		__MAPBOX_TOKEN__?: string;
 	}
 }
 
@@ -49,16 +50,16 @@ export function initMapa({ token, geojson }: MapOptions) {
 
 	if (!token) {
 		showAviso(
-			'Falta o token do mapa',
-			'Crie um token público (começa com pk.) em account.mapbox.com, coloque em PUBLIC_MAPBOX_TOKEN no .env e reinicie o npm run dev.',
+			'Mapa indisponível',
+			'Não foi possível carregar o mapa agora. Volte em instantes ou explore o arquivo pelas bandas.',
 		);
 		return;
 	}
 
 	if (token.startsWith('sk.')) {
 		showAviso(
-			'Este token é secreto',
-			'O Mapbox GL no navegador só aceita token público, que começa com pk. Crie um default public token em account.mapbox.com, troque no .env e reinicie o servidor. Revogue o token sk. se ele já foi usado neste site.',
+			'Mapa indisponível',
+			'Não foi possível carregar o mapa agora. Volte em instantes ou explore o arquivo pelas bandas.',
 		);
 		return;
 	}
@@ -81,8 +82,11 @@ export function initMapa({ token, geojson }: MapOptions) {
 	});
 
 	map.on('error', (event) => {
-		const message = event.error?.message ?? 'Não foi possível carregar o Mapbox.';
-		showAviso('O mapa não carregou', message);
+		console.error('Falha ao carregar o mapa', event.error?.message);
+		showAviso(
+			'O mapa não carregou',
+			'Não foi possível carregar o mapa agora. Volte em instantes ou explore o arquivo pelas bandas.',
+		);
 	});
 
 	map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'bottom-right');

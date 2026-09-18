@@ -1,8 +1,9 @@
 ---
 import { Icon } from 'astro-icon/components';
 import { PUBLIC_MAPBOX_TOKEN } from 'astro:env/client';
+import { getPublicMapboxToken } from '../lib/mapbox-token';
 
-const mapboxToken = PUBLIC_MAPBOX_TOKEN ?? '';
+const mapboxToken = getPublicMapboxToken(PUBLIC_MAPBOX_TOKEN);
 ---
 
 <div
