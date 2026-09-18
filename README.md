@@ -23,9 +23,9 @@ Crie um **token público** em [account.mapbox.com/access-tokens](https://account
 
 ## Deploy (Worker)
 
-O app é um **Cloudflare Worker** na conta amb1 (`account_id` em `wrangler.jsonc`).
+O app é um **Cloudflare Worker** na conta pessoal (`account_id` em `wrangler.jsonc`).
 
-Produção: https://mapa-bandas.amb1.workers.dev
+Produção: https://mapa-bandas.rhamses.workers.dev
 
 ### Deploy local
 
@@ -35,24 +35,14 @@ npm run deploy
 
 ### Deploy a partir do GitHub (Workers Builds)
 
-1. Abra o Worker [mapa-bandas](https://dash.cloudflare.com/182788b23836a15ba32a69d616ba1db1/workers/services/view/mapa-bandas) → **Settings** → **Builds** → **Connect**.
-2. Autorize o GitHub e selecione `rhamses/mapa-bandas`.
-3. Configure:
-   - **Build command:** `npm run build`
-   - **Deploy command:** `npx wrangler deploy`
-   - **Non-production branch deploy command:** `npx wrangler versions upload`
-   - **Production branch:** `main`
-4. Em Variables do build, opcional: `PUBLIC_MAPBOX_TOKEN`.
+Já conectado no dashboard. Em cada push em `main`:
 
-Depois disso, cada push em `main` builda e publica o **Worker** (sem projeto Pages).
+- **Build command:** `npm run build`
+- **Deploy command:** `npx wrangler deploy`
 
-### Alternativa: GitHub Actions
+### CI
 
-O workflow `.github/workflows/ci.yml` valida o build em PRs. Em push para `main`, faz `wrangler deploy` se existirem os secrets:
-
-- `CLOUDFLARE_API_TOKEN`
-- `CLOUDFLARE_ACCOUNT_ID` = `182788b23836a15ba32a69d616ba1db1`
-- `PUBLIC_MAPBOX_TOKEN` (opcional)
+O workflow `.github/workflows/ci.yml` valida o `npm run build` em PRs.
 
 ```sh
 npm run dev
