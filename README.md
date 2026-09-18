@@ -47,8 +47,8 @@ Valor: o token público do Mapbox (começa com `pk.`)
 
 **Não** coloque essa variável no `wrangler.jsonc` — se estiver vazia no arquivo, o deploy pode apagar o valor do dashboard. Cadastre só no Cloudflare:
 
-1. **Workers Builds → Variables** (ou Secrets do build) — o `npm run build` precisa dela para embutir o token no front
-2. **Worker → Settings → Variables and Secrets** — como **Secret**, para o runtime não sobrescrever
+1. **Worker → Settings → Variables and Secrets** — como **Secret** `PUBLIC_MAPBOX_TOKEN` (o site lê em runtime no mapa e na busca de localização)
+2. Opcional: **Workers Builds → Variables** — só necessário se quiser o token também no passo de build
 
 Deploy command recomendado (preserva vars do dashboard):
 

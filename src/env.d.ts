@@ -10,6 +10,7 @@ interface ImportMeta {
 
 interface Window {
 	htmx: typeof import('htmx.org').default;
+	__MAPBOX_TOKEN__?: string;
 }
 
 declare namespace App {
