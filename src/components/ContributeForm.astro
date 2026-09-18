@@ -187,14 +187,19 @@ const mapboxToken = PUBLIC_MAPBOX_TOKEN ?? '';
 		:aria-busy="enviando.toString()"
 		:class="enviando && 'pointer-events-none opacity-80'"
 	>
+		<label class="grid gap-2 text-sm">
+			<span>Nome da banda</span>
+			<input required name="nome" minlength="2" class="rounded-xl border border-ink/15 bg-white px-4 py-3 outline-none focus:border-ochre" />
+		</label>
+
 		<div class="grid gap-5 md:grid-cols-2">
-			<label class="grid gap-2 text-sm">
-				<span>Nome da banda</span>
-				<input required name="nome" minlength="2" class="rounded-xl border border-ink/15 bg-white px-4 py-3 outline-none focus:border-ochre" />
-			</label>
 			<label class="grid gap-2 text-sm">
 				<span>Ano de formação</span>
 				<input name="formacao" type="number" min="1900" max="2026" class="rounded-xl border border-ink/15 bg-white px-4 py-3 outline-none focus:border-ochre" />
+			</label>
+			<label class="grid gap-2 text-sm">
+				<span>Ano de encerramento <span class="font-normal text-ink/45">(opcional)</span></span>
+				<input name="encerramento" type="number" min="1900" max="2026" placeholder="Se ainda ativa, deixe em branco" class="rounded-xl border border-ink/15 bg-white px-4 py-3 outline-none focus:border-ochre" />
 			</label>
 		</div>
 

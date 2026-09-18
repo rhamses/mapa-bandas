@@ -114,12 +114,14 @@ export async function POST({ request }: { request: Request }) {
 	const lat = Number(field(form, 'lat'));
 	const lng = Number(field(form, 'lng'));
 	const formacaoRaw = field(form, 'formacao');
+	const encerramentoRaw = field(form, 'encerramento');
 	const generosRaw = field(form, 'generos');
 	const artigo = field(form, 'artigo');
 	const fontesRaw = field(form, 'fontes');
 	const autor = field(form, 'autor');
 	const email = field(form, 'email');
 	const enviadoEm = new Date().toISOString();
+	const anoAtual = new Date().getFullYear();
 
 	if (nome.length < 2) return html('Diga o nome da banda.', false);
 	if (!mapboxId || cidade.length < 2 || !isValidUf(uf)) {
@@ -136,12 +138,29 @@ export async function POST({ request }: { request: Request }) {
 		return html('Informe um e-mail válido.', false);
 	}
 
+	const formacao = formacaoRaw ? Number(formacaoRaw) : anoAtual;
+	if (!Number.isFinite(formacao) || formacao < 1900 || formacao > anoAtual) {
+		return html('Informe um ano de formação válido.', false);
+	}
+	const formacaoAno = Math.trunc(formacao);
+
+	let encerramento: number | undefined;
+	if (encerramentoRaw) {
+		const fim = Number(encerramentoRaw);
+		if (!Number.isFinite(fim) || fim < 1900 || fim > anoAtual) {
+			return html('Informe um ano de encerramento válido.', false);
+		}
+		encerramento = Math.trunc(fim);
+		if (encerramento < formacaoAno) {
+			return html('O encerramento não pode ser anterior à formação.', false);
+		}
+	}
+
 	const imagemResult = await readImagem(form);
 	if (!imagemResult.ok) return html(imagemResult.error, false);
 
 	const slug = slugifyNome(nome) || 'banda';
 	const id = `${enviadoEm.slice(0, 19).replace(/[:T]/g, '-')}-${slug}`;
-	const formacao = formacaoRaw ? Number(formacaoRaw) : new Date().getFullYear();
 	const generos = parseGeneros(generosRaw);
 	const fontes = parseFontes(fontesRaw);
 	const imagemPath = imagemResult.value
@@ -154,7 +173,8 @@ export async function POST({ request }: { request: Request }) {
 		uf,
 		lat,
 		lng,
-		formacao: Number.isFinite(formacao) ? Math.trunc(formacao) : new Date().getFullYear(),
+		formacao: formacaoAno,
+		...(encerramento !== undefined ? { encerramento } : {}),
 		generos,
 		resumo: resumoFromArtigo(artigo),
 		publicadoEm: enviadoEm.slice(0, 10),
