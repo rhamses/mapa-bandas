@@ -10,7 +10,10 @@
 	"vars": {
 		"ADMIN_USER": "admin",
 		"ADMIN_PASSWORD_SALT": "03237145fbf990a9daf5bf9111a69ea5",
-		"ADMIN_PASSWORD_HASH": "7afe301a2dc26a7e3e4cbeaff2af2f37f169b4c3db24f1f28a0cdf782969e100"
+		"ADMIN_PASSWORD_HASH": "7afe301a2dc26a7e3e4cbeaff2af2f37f169b4c3db24f1f28a0cdf782969e100",
+		// Token público Mapbox (pk.…). Defina o valor no dashboard da Cloudflare
+		// (Workers → mapa-bandas → Settings → Variables / Builds → Variables).
+		"PUBLIC_MAPBOX_TOKEN": ""
 	},
 	"kv_namespaces": [
 		{

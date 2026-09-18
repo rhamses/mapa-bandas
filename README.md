@@ -40,6 +40,18 @@ Já conectado no dashboard. Em cada push em `main`:
 - **Build command:** `npm run build`
 - **Deploy command:** `npx wrangler deploy`
 
+#### Variável Mapbox (obrigatória para mapa e busca de localização)
+
+Nome: **`PUBLIC_MAPBOX_TOKEN`**  
+Valor: o token público do Mapbox (começa com `pk.`)
+
+Cadastre em dois lugares no dashboard da Cloudflare (conta do Worker `mapa-bandas`):
+
+1. **Workers Builds → Settings → Variables** — disponível no `npm run build`
+2. **Worker → Settings → Variables and Secrets** — binding de runtime (mesmo nome; o `wrangler.jsonc` já declara a var)
+
+Localmente continue usando `.env` / `.dev.vars`.
+
 ### CI
 
 O workflow `.github/workflows/ci.yml` valida o `npm run build` em PRs.
