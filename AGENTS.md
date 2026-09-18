@@ -8,6 +8,10 @@ astro dev --background
 
 Manage the background server with `astro dev stop`, `astro dev status`, and `astro dev logs`.
 
+## GitHub workflow
+
+At the end of every task: create the PR, mark it ready, merge it when CI is green, and verify the production deploy. Do not leave finished work sitting in an open PR.
+
 ## Documentation
 
 Full documentation: https://docs.astro.build
