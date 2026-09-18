@@ -129,6 +129,7 @@ function normalizeMeta(raw: string | null, fallbackSavedAt?: string): SubmissaoM
 		return {
 			savedAt: fallbackSavedAt ?? new Date(0).toISOString(),
 			status: 'aprovada',
+			creditoPublico: true,
 		};
 	}
 	try {
