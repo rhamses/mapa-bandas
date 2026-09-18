@@ -48,4 +48,11 @@ npm run dev
 
 ## Conteúdo
 
-As bandas publicadas ficam em `src/content/bandas/` como Markdown. As contribuições públicas são gravadas em `data/submissoes/` para revisão.
+As bandas do acervo inicial ficam em `src/content/bandas/` como Markdown. O site carrega esse acervo **e** as contribuições em runtime (SSR), então novos envios aparecem sem rebuild.
+
+Cada contribuição pública:
+
+1. Grava um `.md` em `data/submissoes/`
+2. Se houver imagem, grava em `data/submissoes/imagens/`
+3. Também persiste no KV `SUBMISSOES` (necessário no deploy Cloudflare, onde o disco do Worker não é permanente)
+4. Serve imagens em `/media/submissoes/:id`

@@ -16,11 +16,13 @@ const bandas = defineCollection({
 		resumo: z.string(),
 		publicadoEm: z.coerce.date(),
 		destaque: z.boolean().default(false),
+		imagem: z.string().optional(),
+		autor: z.string().optional(),
 		fontes: z
 			.array(
 				z.object({
 					titulo: z.string(),
-					url: z.string().url(),
+					url: z.string(),
 				}),
 			)
 			.optional(),

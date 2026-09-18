@@ -1,20 +1,17 @@
 ---
-import { getCollection, render } from 'astro:content';
+export const prerender = false;
+
 import { Icon } from 'astro-icon/components';
 import Base from '../../layouts/Base.astro';
-import { local, periodo, permalink } from '../../lib/bandas';
+import { getBanda, local, periodo, permalink } from '../../lib/bandas';
 import { site } from '../../lib/site';
 
-export async function getStaticPaths() {
-	const bandas = await getCollection('bandas');
-	return bandas.map((banda) => ({
-		params: { id: banda.id },
-		props: { banda },
-	}));
-}
+const id = Astro.params.id;
+if (!id) return Astro.rewrite('/404');
 
-const { banda } = Astro.props;
-const { Content } = await render(banda);
+const banda = await getBanda(id);
+if (!banda) return Astro.rewrite('/404');
+
 const url = permalink(banda);
 const jsonLd = {
 	'@context': 'https://schema.org',
@@ -24,6 +21,9 @@ const jsonLd = {
 	genre: banda.data.generos,
 	url: new URL(url, site.url).href,
 	description: banda.data.resumo,
+	...(banda.data.imagem
+		? { image: new URL(banda.data.imagem, site.url).href }
+		: {}),
 	location: {
 		'@type': 'Place',
 		name: local(banda),
@@ -65,10 +65,19 @@ const jsonLd = {
 				))
 			}
 		</div>
+		{
+			banda.data.imagem && (
+				<figure class="mt-10 overflow-hidden rounded-3xl border border-ink/10">
+					<img
+						src={banda.data.imagem}
+						alt={`Imagem de ${banda.data.nome}`}
+						class="aspect-[16/10] w-full object-cover"
+					/>
+				</figure>
+			)
+		}
 		<p class="mt-10 text-xl leading-relaxed text-ink/80">{banda.data.resumo}</p>
-		<div class="prose prose-lg mt-10 max-w-none prose-headings:font-serif prose-a:text-ochre">
-			<Content />
-		</div>
+		<div class="prose prose-lg mt-10 max-w-none prose-headings:font-serif prose-a:text-ochre" set:html={banda.html} />
 		{
 			banda.data.fontes && banda.data.fontes.length > 0 && (
 				<section class="mt-12 border-t border-ink/10 pt-8">
@@ -76,10 +85,14 @@ const jsonLd = {
 					<ul class="mt-4 space-y-2 text-sm">
 						{banda.data.fontes.map((fonte) => (
 							<li>
-								<a class="inline-flex items-center gap-2 text-ink/70 hover:text-ochre" href={fonte.url} rel="noopener noreferrer">
-									<Icon name="lucide:external-link" class="size-3.5" />
-									{fonte.titulo}
-								</a>
+								{fonte.url && fonte.url !== '#' ? (
+									<a class="inline-flex items-center gap-2 text-ink/70 hover:text-ochre" href={fonte.url} rel="noopener noreferrer">
+										<Icon name="lucide:external-link" class="size-3.5" />
+										{fonte.titulo}
+									</a>
+								) : (
+									<span class="text-ink/70">{fonte.titulo}</span>
+								)}
 							</li>
 						))}
 					</ul>
@@ -88,6 +101,7 @@ const jsonLd = {
 		}
 		<p class="mt-12 text-xs text-ink/40">
 			Entrada publicada em {banda.data.publicadoEm.toLocaleDateString('pt-BR', { timeZone: 'UTC' })}.
+			{banda.data.autor && <> Contribuição de {banda.data.autor}.</>}
 		</p>
 	</article>
 </Base>

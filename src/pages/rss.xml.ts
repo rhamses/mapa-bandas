@@ -1,3 +1,5 @@
+export const prerender = false;
+
 import rss from '@astrojs/rss';
 import { getBandas, permalink } from '../lib/bandas';
 import { site } from '../lib/site';

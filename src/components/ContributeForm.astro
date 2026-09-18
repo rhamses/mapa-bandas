@@ -6,10 +6,12 @@ import { ufs } from '../lib/site';
 <form
 	id="form-contribuicao"
 	class="grid gap-5"
+	enctype="multipart/form-data"
 	hx-post="/api/contribuicao"
+	hx-encoding="multipart/form-data"
 	hx-target="#form-status"
 	hx-swap="innerHTML"
-	x-data="{ artigo: '', honeypot: '' }"
+	x-data="{ artigo: '', honeypot: '', imagemNome: '' }"
 >
 	<div class="grid gap-5 md:grid-cols-2">
 		<label class="grid gap-2 text-sm">
@@ -42,6 +44,21 @@ import { ufs } from '../lib/site';
 	<label class="grid gap-2 text-sm">
 		<span>Gêneros (separados por vírgula)</span>
 		<input name="generos" placeholder="Manguebeat, psicodelia, punk" class="rounded-xl border border-ink/15 bg-white px-4 py-3 outline-none focus:border-ochre" />
+	</label>
+
+	<label class="grid gap-2 text-sm">
+		<span>Imagem da banda <span class="text-ink/45">(opcional)</span></span>
+		<div class="flex flex-wrap items-center gap-3 rounded-xl border border-dashed border-ink/20 bg-white px-4 py-3">
+			<Icon name="lucide:image" class="size-4 text-ochre" />
+			<input
+				name="imagem"
+				type="file"
+				accept="image/jpeg,image/png,image/webp,image/gif"
+				class="w-full text-sm file:mr-3 file:rounded-full file:border-0 file:bg-ink/5 file:px-3 file:py-1.5 file:text-xs file:font-medium"
+				@change="imagemNome = $event.target.files?.[0]?.name ?? ''"
+			/>
+		</div>
+		<span class="text-xs text-ink/45" x-text="imagemNome ? `Selecionada: ${imagemNome}` : 'JPG, PNG, WebP ou GIF · até 5 MB'"></span>
 	</label>
 
 	<label class="grid gap-2 text-sm">

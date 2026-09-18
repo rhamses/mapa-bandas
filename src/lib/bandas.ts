@@ -1,6 +1,30 @@
-import { getCollection, type CollectionEntry } from 'astro:content';
+import { parseMarkdown } from './markdown';
+import { listSubmissaoMarkdown } from './submissoes';
 
-export type Banda = CollectionEntry<'bandas'>;
+export type BandaData = {
+	nome: string;
+	cidade: string;
+	uf: string;
+	lat: number;
+	lng: number;
+	formacao: number;
+	encerramento?: number;
+	generos: string[];
+	resumo: string;
+	publicadoEm: Date;
+	destaque: boolean;
+	imagem?: string;
+	fontes?: Array<{ titulo: string; url: string }>;
+	autor?: string;
+};
+
+export type Banda = {
+	id: string;
+	data: BandaData;
+	body: string;
+	html: string;
+	origem: 'acervo' | 'submissao';
+};
 
 export type BandaMapa = {
 	id: string;
@@ -12,7 +36,88 @@ export type BandaMapa = {
 	generos: string;
 	resumo: string;
 	url: string;
+	imagem?: string;
 };
+
+const seedModules = import.meta.glob('../content/bandas/*.md', {
+	eager: true,
+	query: '?raw',
+	import: 'default',
+}) as Record<string, string>;
+
+function coerceBandaData(raw: Record<string, unknown>): BandaData | null {
+	if (typeof raw.nome !== 'string' || typeof raw.cidade !== 'string') return null;
+	if (typeof raw.uf !== 'string' || raw.uf.length !== 2) return null;
+
+	const formacao = Number(raw.formacao);
+	const lat = Number(raw.lat);
+	const lng = Number(raw.lng);
+	if (!Number.isFinite(formacao) || !Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+
+	const generos = Array.isArray(raw.generos)
+		? raw.generos.map(String).map((g) => g.trim()).filter(Boolean)
+		: typeof raw.generos === 'string'
+			? raw.generos.split(',').map((g) => g.trim()).filter(Boolean)
+			: [];
+
+	const publicadoEm = raw.publicadoEm ? new Date(String(raw.publicadoEm)) : new Date();
+	if (Number.isNaN(publicadoEm.valueOf())) return null;
+
+	const fontes = Array.isArray(raw.fontes)
+		? raw.fontes
+				.map((item) => {
+					if (!item || typeof item !== 'object') return null;
+					const fonte = item as Record<string, unknown>;
+					if (typeof fonte.titulo !== 'string' || typeof fonte.url !== 'string') return null;
+					return { titulo: fonte.titulo, url: fonte.url };
+				})
+				.filter((f): f is { titulo: string; url: string } => Boolean(f))
+		: undefined;
+
+	return {
+		nome: raw.nome,
+		cidade: raw.cidade,
+		uf: raw.uf.toUpperCase(),
+		lat,
+		lng,
+		formacao: Math.trunc(formacao),
+		encerramento:
+			raw.encerramento !== undefined && raw.encerramento !== null && raw.encerramento !== ''
+				? Math.trunc(Number(raw.encerramento))
+				: undefined,
+		generos,
+		resumo: typeof raw.resumo === 'string' ? raw.resumo : raw.nome,
+		publicadoEm,
+		destaque: Boolean(raw.destaque),
+		imagem: typeof raw.imagem === 'string' && raw.imagem ? raw.imagem : undefined,
+		fontes,
+		autor: typeof raw.autor === 'string' ? raw.autor : undefined,
+	};
+}
+
+function entryFromMarkdown(id: string, markdown: string, origem: Banda['origem']): Banda | null {
+	const parsed = parseMarkdown(markdown);
+	const data = coerceBandaData(parsed.data);
+	if (!data) return null;
+	return {
+		id,
+		data,
+		body: parsed.body,
+		html: parsed.html,
+		origem,
+	};
+}
+
+function loadSeedBandas(): Banda[] {
+	const bandas: Banda[] = [];
+	for (const [modulePath, markdown] of Object.entries(seedModules)) {
+		const file = modulePath.split('/').pop() ?? modulePath;
+		const id = file.replace(/\.md$/, '');
+		const entry = entryFromMarkdown(id, markdown, 'acervo');
+		if (entry) bandas.push(entry);
+	}
+	return bandas;
+}
 
 export function permalink(banda: Banda) {
 	return `/bandas/${banda.id}`;
@@ -51,9 +156,32 @@ export function sortByRecentes(bandas: Banda[]) {
 	);
 }
 
-export async function getBandas() {
-	const bandas = await getCollection('bandas');
-	return sortByRecentes(bandas);
+export async function getBandas(): Promise<Banda[]> {
+	const byId = new Map<string, Banda>();
+
+	for (const banda of loadSeedBandas()) {
+		byId.set(banda.id, banda);
+	}
+
+	try {
+		const submissoes = await listSubmissaoMarkdown();
+		for (const item of submissoes) {
+			const entry = entryFromMarkdown(item.id, item.markdown, 'submissao');
+			if (!entry) continue;
+			// submissões novas não sobrescrevem o acervo canônico
+			if (byId.has(entry.id) && byId.get(entry.id)?.origem === 'acervo') continue;
+			byId.set(entry.id, entry);
+		}
+	} catch {
+		// KV/FS indisponível — segue só com o acervo
+	}
+
+	return sortByRecentes([...byId.values()]);
+}
+
+export async function getBanda(id: string): Promise<Banda | undefined> {
+	const bandas = await getBandas();
+	return bandas.find((banda) => banda.id === id);
 }
 
 export function toMapaFeatures(bandas: Banda[]) {
@@ -75,7 +203,17 @@ export function toMapaFeatures(bandas: Banda[]) {
 				generos: banda.data.generos.join(' · '),
 				resumo: banda.data.resumo,
 				url: permalink(banda),
+				imagem: banda.data.imagem,
 			} satisfies BandaMapa,
 		})),
 	};
+}
+
+export function slugifyNome(nome: string) {
+	return nome
+		.normalize('NFD')
+		.replace(/\p{Diacritic}/gu, '')
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, '-')
+		.replace(/(^-|-$)/g, '');
 }
