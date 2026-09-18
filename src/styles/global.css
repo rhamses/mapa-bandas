@@ -1,0 +1,45 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+@import "@fontsource-variable/figtree/index.css";
+@import "@fontsource-variable/fraunces/index.css";
+
+@theme {
+	--font-sans: "Figtree Variable", ui-sans-serif, system-ui, sans-serif;
+	--font-serif: "Fraunces Variable", ui-serif, Georgia, serif;
+	--color-ink: #14110e;
+	--color-ink-soft: #2c261f;
+	--color-paper: #f4ead8;
+	--color-paper-muted: #e7dcc6;
+	--color-ochre: #c45c26;
+	--color-ochre-hot: #e07038;
+	--color-gold: #d4a84b;
+	--color-forest: #1c4a3c;
+	--color-clay: #7a3428;
+}
+
+@layer base {
+	html {
+		scroll-behavior: smooth;
+	}
+
+	body {
+		@apply bg-paper text-ink antialiased;
+	}
+
+	::selection {
+		@apply bg-ochre text-paper;
+	}
+
+	[x-cloak] {
+		display: none !important;
+	}
+
+	[data-icon] {
+		display: inline-block;
+		flex-shrink: 0;
+	}
+}
+
+@utility grain {
+	background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.45'/%3E%3C/svg%3E");
+}

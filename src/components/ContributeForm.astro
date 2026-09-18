@@ -1,0 +1,90 @@
+---
+import { Icon } from 'astro-icon/components';
+import { ufs } from '../lib/site';
+---
+
+<form
+	id="form-contribuicao"
+	class="grid gap-5"
+	hx-post="/api/contribuicao"
+	hx-target="#form-status"
+	hx-swap="innerHTML"
+	x-data="{ artigo: '', honeypot: '' }"
+>
+	<div class="grid gap-5 md:grid-cols-2">
+		<label class="grid gap-2 text-sm">
+			<span>Nome da banda</span>
+			<input required name="nome" minlength="2" class="rounded-xl border border-ink/15 bg-white px-4 py-3 outline-none focus:border-ochre" />
+		</label>
+		<label class="grid gap-2 text-sm">
+			<span>Ano de formação</span>
+			<input name="formacao" type="number" min="1900" max="2026" class="rounded-xl border border-ink/15 bg-white px-4 py-3 outline-none focus:border-ochre" />
+		</label>
+	</div>
+
+	<div class="grid gap-5 md:grid-cols-[1.4fr_0.8fr]">
+		<label class="grid gap-2 text-sm">
+			<span>Cidade</span>
+			<input required name="cidade" class="rounded-xl border border-ink/15 bg-white px-4 py-3 outline-none focus:border-ochre" />
+		</label>
+		<label class="grid gap-2 text-sm">
+			<span>Estado</span>
+			<div class="relative">
+				<select required name="uf" class="w-full appearance-none rounded-xl border border-ink/15 bg-white px-4 py-3 outline-none focus:border-ochre">
+					<option value="">UF</option>
+					{ufs.map((uf) => <option value={uf.sigla}>{uf.sigla} — {uf.nome}</option>)}
+				</select>
+				<Icon name="lucide:chevrons-up-down" class="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-ink/40" />
+			</div>
+		</label>
+	</div>
+
+	<label class="grid gap-2 text-sm">
+		<span>Gêneros (separados por vírgula)</span>
+		<input name="generos" placeholder="Manguebeat, psicodelia, punk" class="rounded-xl border border-ink/15 bg-white px-4 py-3 outline-none focus:border-ochre" />
+	</label>
+
+	<label class="grid gap-2 text-sm">
+		<span>Artigo</span>
+		<textarea
+			required
+			name="artigo"
+			minlength="80"
+			rows="10"
+			x-model="artigo"
+			placeholder="Conte a história da banda, a cidade, a cena e por que ela importa."
+			class="rounded-xl border border-ink/15 bg-white px-4 py-3 outline-none focus:border-ochre"
+		></textarea>
+		<span class="text-xs text-ink/45" x-text="`${artigo.trim().length} caracteres · mínimo 80`"></span>
+	</label>
+
+	<label class="grid gap-2 text-sm">
+		<span>Fontes e links</span>
+		<textarea name="fontes" rows="3" placeholder="URLs, livros, entrevistas, acervos" class="rounded-xl border border-ink/15 bg-white px-4 py-3 outline-none focus:border-ochre"></textarea>
+	</label>
+
+	<div class="grid gap-5 md:grid-cols-2">
+		<label class="grid gap-2 text-sm">
+			<span>Seu nome</span>
+			<input required name="autor" class="rounded-xl border border-ink/15 bg-white px-4 py-3 outline-none focus:border-ochre" />
+		</label>
+		<label class="grid gap-2 text-sm">
+			<span>E-mail</span>
+			<input required name="email" type="email" class="rounded-xl border border-ink/15 bg-white px-4 py-3 outline-none focus:border-ochre" />
+		</label>
+	</div>
+
+	<div class="hidden" aria-hidden="true">
+		<input name="website" tabindex="-1" autocomplete="off" x-model="honeypot" />
+	</div>
+
+	<div id="form-status"></div>
+
+	<button
+		type="submit"
+		class="inline-flex items-center justify-center gap-2 rounded-full bg-ochre px-6 py-3 text-sm font-medium text-paper transition hover:bg-ochre-hot"
+	>
+		<Icon name="lucide:send" class="size-4" />
+		Enviar contribuição
+	</button>
+</form>

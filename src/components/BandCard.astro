@@ -1,0 +1,44 @@
+---
+import { Icon } from 'astro-icon/components';
+import { local, periodo, permalink, type Banda } from '../lib/bandas';
+
+interface Props {
+	banda: Banda;
+	featured?: boolean;
+}
+
+const { banda, featured = false } = Astro.props;
+const href = permalink(banda);
+---
+
+<article
+	class:list={[
+		'group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-ink/10 bg-white/40 p-6 transition hover:-translate-y-0.5 hover:border-ochre/40 hover:shadow-[0_18px_40px_-24px_rgba(20,17,14,0.45)]',
+		featured && 'md:min-h-72',
+	]}
+>
+	<div>
+		<p class="text-[11px] uppercase tracking-[0.22em] text-ochre">
+			{local(banda)} · {periodo(banda)}
+		</p>
+		<h2 class="mt-3 font-serif text-3xl leading-tight tracking-tight">
+			<a href={href} class="after:absolute after:inset-0">{banda.data.nome}</a>
+		</h2>
+		<p class="mt-3 text-sm leading-relaxed text-ink/70">{banda.data.resumo}</p>
+	</div>
+	<div class="mt-6 flex items-center justify-between gap-3">
+		<div class="flex flex-wrap gap-2">
+			{
+				banda.data.generos.slice(0, 3).map((genero) => (
+					<span class="rounded-full bg-ink/5 px-2.5 py-1 text-[11px] uppercase tracking-wider text-ink/70">
+						{genero}
+					</span>
+				))
+			}
+		</div>
+		<span class="inline-flex items-center gap-1 text-sm text-ochre">
+			Ler
+			<Icon name="lucide:arrow-right" class="size-4 transition group-hover:translate-x-0.5" />
+		</span>
+	</div>
+</article>

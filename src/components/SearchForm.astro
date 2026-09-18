@@ -1,0 +1,38 @@
+---
+import { Icon } from 'astro-icon/components';
+
+interface Props {
+	query?: string;
+	target?: string;
+	action?: string;
+}
+
+const { query = '', target = '#resultados', action = '/partials/busca' } = Astro.props;
+---
+
+<form
+	class="relative"
+	action="/bandas"
+	method="get"
+	hx-get={action}
+	hx-trigger="keyup changed delay:280ms from:input, search from:input, submit"
+	hx-target={target}
+	hx-push-url="false"
+>
+	<label class="sr-only" for="q">Buscar bandas</label>
+	<Icon name="lucide:search" class="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-ink/40" />
+	<input
+		id="q"
+		name="q"
+		type="search"
+		value={query}
+		placeholder="Busque por banda, cidade, estado ou gênero"
+		class="w-full rounded-full border border-ink/15 bg-white/80 py-4 pl-12 pr-28 text-base outline-none ring-ochre/30 placeholder:text-ink/40 focus:border-ochre focus:ring-4"
+	/>
+	<button
+		type="submit"
+		class="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-ink px-4 py-2 text-sm text-paper transition hover:bg-ochre"
+	>
+		Buscar
+	</button>
+</form>

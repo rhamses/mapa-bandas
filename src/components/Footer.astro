@@ -1,0 +1,39 @@
+---
+import { Icon } from 'astro-icon/components';
+import { site } from '../lib/site';
+---
+
+<footer class="mt-24 border-t border-ink/10 bg-ink text-paper">
+	<div class="mx-auto grid max-w-6xl gap-10 px-4 py-14 md:grid-cols-[1.4fr_1fr_1fr] md:px-6">
+		<div>
+			<p class="font-serif text-3xl tracking-tight">{site.nome}</p>
+			<p class="mt-3 max-w-sm text-sm leading-relaxed text-paper/70">{site.descricao}</p>
+		</div>
+		<div>
+			<p class="text-xs uppercase tracking-[0.2em] text-gold">Navegar</p>
+			<ul class="mt-4 space-y-2 text-sm text-paper/80">
+				<li><a class="hover:text-paper" href="/mapa">Mapa do Brasil</a></li>
+				<li><a class="hover:text-paper" href="/bandas">Todas as bandas</a></li>
+				<li><a class="hover:text-paper" href="/contribuicao">Enviar artigo</a></li>
+			</ul>
+		</div>
+		<div>
+			<p class="text-xs uppercase tracking-[0.2em] text-gold">Arquivo</p>
+			<ul class="mt-4 space-y-2 text-sm text-paper/80">
+				<li>
+					<a class="inline-flex items-center gap-2 hover:text-paper" href="/rss.xml">
+						<Icon name="lucide:rss" class="size-3.5" /> Feed RSS
+					</a>
+				</li>
+				<li>
+					<a class="inline-flex items-center gap-2 hover:text-paper" href="/sitemap-index.xml">
+						<Icon name="lucide:globe" class="size-3.5" /> Sitemap
+					</a>
+				</li>
+			</ul>
+		</div>
+	</div>
+	<p class="border-t border-white/10 px-4 py-5 text-center text-xs text-paper/45">
+		Um repositório aberto da música feita nas cidades do Brasil.
+	</p>
+</footer>

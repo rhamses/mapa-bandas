@@ -1,0 +1,93 @@
+---
+import { getCollection, render } from 'astro:content';
+import { Icon } from 'astro-icon/components';
+import Base from '../../layouts/Base.astro';
+import { local, periodo, permalink } from '../../lib/bandas';
+import { site } from '../../lib/site';
+
+export async function getStaticPaths() {
+	const bandas = await getCollection('bandas');
+	return bandas.map((banda) => ({
+		params: { id: banda.id },
+		props: { banda },
+	}));
+}
+
+const { banda } = Astro.props;
+const { Content } = await render(banda);
+const url = permalink(banda);
+const jsonLd = {
+	'@context': 'https://schema.org',
+	'@type': 'MusicGroup',
+	name: banda.data.nome,
+	foundingDate: String(banda.data.formacao),
+	genre: banda.data.generos,
+	url: new URL(url, site.url).href,
+	description: banda.data.resumo,
+	location: {
+		'@type': 'Place',
+		name: local(banda),
+		geo: {
+			'@type': 'GeoCoordinates',
+			latitude: banda.data.lat,
+			longitude: banda.data.lng,
+		},
+	},
+};
+---
+
+<Base title={banda.data.nome} description={banda.data.resumo} permalink={url} type="article">
+	<script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+	<article class="mx-auto max-w-3xl px-4 py-16 md:px-0">
+		<p class="text-[11px] uppercase tracking-[0.22em] text-ochre">
+			<a href="/bandas" class="hover:text-ink">Arquivo</a>
+			· {local(banda)}
+		</p>
+		<h1 class="mt-4 font-serif text-5xl tracking-tight md:text-6xl">{banda.data.nome}</h1>
+		<div class="mt-6 flex flex-wrap gap-3 text-sm text-ink/60">
+			<span class="inline-flex items-center gap-1.5">
+				<Icon name="lucide:calendar" class="size-4 text-ochre" />
+				{periodo(banda)}
+			</span>
+			<span class="inline-flex items-center gap-1.5">
+				<Icon name="lucide:map-pin" class="size-4 text-ochre" />
+				{local(banda)}
+			</span>
+			<a href={`/mapa#${banda.id}`} class="inline-flex items-center gap-1.5 hover:text-ochre">
+				<Icon name="lucide:map" class="size-4" />
+				Ver no mapa
+			</a>
+		</div>
+		<div class="mt-6 flex flex-wrap gap-2">
+			{
+				banda.data.generos.map((genero) => (
+					<span class="rounded-full bg-ink/5 px-3 py-1 text-xs uppercase tracking-wider">{genero}</span>
+				))
+			}
+		</div>
+		<p class="mt-10 text-xl leading-relaxed text-ink/80">{banda.data.resumo}</p>
+		<div class="prose prose-lg mt-10 max-w-none prose-headings:font-serif prose-a:text-ochre">
+			<Content />
+		</div>
+		{
+			banda.data.fontes && banda.data.fontes.length > 0 && (
+				<section class="mt-12 border-t border-ink/10 pt-8">
+					<h2 class="text-xs uppercase tracking-[0.22em] text-ochre">Fontes</h2>
+					<ul class="mt-4 space-y-2 text-sm">
+						{banda.data.fontes.map((fonte) => (
+							<li>
+								<a class="inline-flex items-center gap-2 text-ink/70 hover:text-ochre" href={fonte.url} rel="noopener noreferrer">
+									<Icon name="lucide:external-link" class="size-3.5" />
+									{fonte.titulo}
+								</a>
+							</li>
+						))}
+					</ul>
+				</section>
+			)
+		}
+		<p class="mt-12 text-xs text-ink/40">
+			Entrada publicada em {banda.data.publicadoEm.toLocaleDateString('pt-BR', { timeZone: 'UTC' })}.
+		</p>
+	</article>
+</Base>

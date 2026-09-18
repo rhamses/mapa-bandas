@@ -1,0 +1,20 @@
+---
+export const prerender = false;
+
+import BandCard from '../../components/BandCard.astro';
+import { buscaBandas, getBandas } from '../../lib/bandas';
+
+const query = Astro.url.searchParams.get('q') ?? '';
+const bandas = buscaBandas(await getBandas(), query);
+const recorte = query ? bandas : bandas.slice(0, 8);
+---
+
+{
+	recorte.length > 0 ? (
+		recorte.map((banda) => <BandCard banda={banda} />)
+	) : (
+		<p class="rounded-2xl border border-dashed border-ink/15 p-8 text-ink/60">
+			Nenhuma banda encontrada para “{query}”.
+		</p>
+	)
+}

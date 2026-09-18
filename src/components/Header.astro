@@ -1,0 +1,106 @@
+---
+import { Icon } from 'astro-icon/components';
+import { site } from '../lib/site';
+
+const path = Astro.url.pathname;
+const overlay = Astro.props.overlay ?? false;
+
+interface Props {
+	overlay?: boolean;
+}
+
+const links = [
+	{ href: '/', label: 'Arquivo' },
+	{ href: '/mapa', label: 'Mapa' },
+	{ href: '/bandas', label: 'Bandas' },
+	{ href: '/contribuicao', label: 'Contribuição' },
+];
+
+const shell = overlay
+	? 'absolute inset-x-0 top-0 z-30 border-b border-white/10 bg-ink/70 text-paper backdrop-blur-md'
+	: 'sticky top-0 z-30 border-b border-ink/10 bg-paper/90 backdrop-blur-md';
+---
+
+<header class={shell} x-data="{ open: false }">
+	<div class="mx-auto flex max-w-6xl items-center justify-between gap-6 px-4 py-4 md:px-6">
+		<a href="/" class="group flex items-center gap-3">
+			<span
+				class:list={[
+					'grid size-9 place-items-center rounded-full border',
+					overlay ? 'border-gold/50 text-gold' : 'border-ochre/40 text-ochre',
+				]}
+			>
+				<Icon name="lucide:mic-vocal" class="size-4" />
+			</span>
+			<span class="leading-tight">
+				<span class="block font-serif text-lg tracking-tight">{site.nome}</span>
+				<span class:list={['block text-[11px] uppercase tracking-[0.22em]', overlay ? 'text-paper/60' : 'text-ink/50']}>
+					arquivo local
+				</span>
+			</span>
+		</a>
+
+		<nav class="hidden items-center gap-7 md:flex" aria-label="Principal">
+			{
+				links.map((link) => (
+					<a
+						href={link.href}
+						class:list={[
+							'text-sm tracking-wide transition',
+							path === link.href || (link.href !== '/' && path.startsWith(link.href))
+								? overlay
+									? 'text-gold'
+									: 'text-ochre'
+								: overlay
+									? 'text-paper/75 hover:text-paper'
+									: 'text-ink/70 hover:text-ink',
+						]}
+					>
+						{link.label}
+					</a>
+				))
+			}
+			<a
+				href={site.rss}
+				class:list={[
+					'inline-flex items-center gap-1.5 text-sm',
+					overlay ? 'text-paper/70 hover:text-paper' : 'text-ink/60 hover:text-ink',
+				]}
+			>
+				<Icon name="lucide:rss" class="size-3.5" />
+				RSS
+			</a>
+		</nav>
+
+		<button
+			type="button"
+			class="inline-flex items-center justify-center rounded-full border border-current/20 p-2 md:hidden"
+			@click="open = !open"
+			:aria-expanded="open.toString()"
+			aria-controls="menu-mobile"
+			aria-label="Abrir menu"
+		>
+			<Icon name="lucide:menu" class="size-5" x-show="!open" />
+			<Icon name="lucide:x" class="size-5" x-cloak x-show="open" />
+		</button>
+	</div>
+
+	<nav
+		id="menu-mobile"
+		class="border-t border-current/10 px-4 py-4 md:hidden"
+		x-cloak
+		x-show="open"
+		x-transition
+		aria-label="Mobile"
+	>
+		<div class="flex flex-col gap-3">
+			{
+				links.map((link) => (
+					<a href={link.href} class="py-1 text-base" @click="open = false">
+						{link.label}
+					</a>
+				))
+			}
+		</div>
+	</nav>
+</header>

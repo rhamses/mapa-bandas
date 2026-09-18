@@ -1,0 +1,86 @@
+---
+import { Icon } from 'astro-icon/components';
+import BandCard from '../components/BandCard.astro';
+import SearchForm from '../components/SearchForm.astro';
+import Base from '../layouts/Base.astro';
+import { getBandas } from '../lib/bandas';
+import { site } from '../lib/site';
+
+const bandas = await getBandas();
+const recentes = bandas.slice(0, 8);
+const destaques = bandas.filter((banda) => banda.data.destaque).slice(0, 3);
+const jsonLd = {
+	'@context': 'https://schema.org',
+	'@type': 'CollectionPage',
+	name: site.nome,
+	description: site.descricao,
+	url: site.url,
+};
+---
+
+<Base>
+	<script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+
+	<section class="relative overflow-hidden border-b border-ink/10">
+		<div class="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(196,92,38,0.18),transparent_42%),radial-gradient(circle_at_80%_20%,rgba(212,168,75,0.16),transparent_35%)]"></div>
+		<div class="relative mx-auto max-w-6xl px-4 py-16 md:px-6 md:py-24">
+			<p class="text-xs uppercase tracking-[0.28em] text-ochre">repositório em construção</p>
+			<h1 class="mt-4 max-w-3xl font-serif text-5xl leading-[0.95] tracking-tight md:text-7xl">
+				A história das bandas locais cabe num mapa.
+			</h1>
+			<p class="mt-6 max-w-2xl text-lg leading-relaxed text-ink/70">
+				{site.descricao} Busque uma cidade, um gênero, um nome. Ou abra o Brasil inteiro.
+			</p>
+			<div class="mt-10 max-w-2xl">
+				<SearchForm />
+			</div>
+			<div class="mt-8 flex flex-wrap gap-3">
+				<a href="/mapa" class="inline-flex items-center gap-2 rounded-full bg-ink px-5 py-3 text-sm text-paper hover:bg-ochre">
+					<Icon name="lucide:map" class="size-4" />
+					Abrir o mapa
+				</a>
+				<a href="/contribuicao" class="inline-flex items-center gap-2 rounded-full border border-ink/15 px-5 py-3 text-sm hover:border-ochre hover:text-ochre">
+					<Icon name="lucide:pen-line" class="size-4" />
+					Enviar um artigo
+				</a>
+			</div>
+		</div>
+	</section>
+
+	<section class="mx-auto max-w-6xl px-4 py-16 md:px-6">
+		<div class="mb-8 flex items-end justify-between gap-4">
+			<div>
+				<p class="text-xs uppercase tracking-[0.22em] text-ochre">últimas entradas</p>
+				<h2 class="mt-2 font-serif text-4xl tracking-tight">O arquivo recente</h2>
+			</div>
+			<a href="/bandas" class="hidden items-center gap-1 text-sm text-ochre md:inline-flex">
+				Ver todas
+				<Icon name="lucide:arrow-right" class="size-4" />
+			</a>
+		</div>
+		<div id="resultados" class="grid gap-5 md:grid-cols-2">
+			{recentes.map((banda) => <BandCard banda={banda} />)}
+		</div>
+	</section>
+
+	{
+		destaques.length > 0 && (
+			<section class="border-y border-ink/10 bg-ink py-16 text-paper">
+				<div class="mx-auto max-w-6xl px-4 md:px-6">
+					<p class="text-xs uppercase tracking-[0.22em] text-gold">destaques do acervo</p>
+					<div class="mt-8 grid gap-8 md:grid-cols-3">
+						{destaques.map((banda) => (
+							<a href={`/bandas/${banda.id}`} class="group">
+								<p class="text-xs uppercase tracking-[0.2em] text-paper/50">
+									{banda.data.cidade} · {banda.data.uf}
+								</p>
+								<h3 class="mt-3 font-serif text-3xl group-hover:text-gold">{banda.data.nome}</h3>
+								<p class="mt-3 text-sm leading-relaxed text-paper/70">{banda.data.resumo}</p>
+							</a>
+						))}
+					</div>
+				</div>
+			</section>
+		)
+	}
+</Base>

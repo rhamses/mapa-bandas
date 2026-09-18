@@ -1,0 +1,27 @@
+---
+import Header from '../components/Header.astro';
+import Seo from '../components/Seo.astro';
+import '../styles/global.css';
+
+interface Props {
+	title?: string;
+	description?: string;
+}
+
+const { title, description } = Astro.props;
+---
+
+<!doctype html>
+<html lang="pt-BR" class="h-full">
+	<head>
+		<Seo title={title} description={description} />
+	</head>
+	<body class="relative h-dvh overflow-hidden bg-ink font-sans text-paper">
+		<Header overlay />
+		<slot />
+		<script>
+			import htmx from 'htmx.org';
+			window.htmx = htmx;
+		</script>
+	</body>
+</html>

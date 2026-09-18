@@ -1,0 +1,20 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "mapa-bandas",
+	"account_id": "e94a2dcc138e0d8cb51a991dc40fdbb7",
+	"compatibility_date": "2026-09-17",
+	"compatibility_flags": ["nodejs_compat"],
+	"observability": {
+		"enabled": true
+	},
+	"kv_namespaces": [
+		{
+			"binding": "SESSION",
+			"id": "f25c439182b042a9849024dea6eeed2a"
+		},
+		{
+			"binding": "SUBMISSOES",
+			"id": "d14e77da22694f67a2e32c8f56356128"
+		}
+	]
+}

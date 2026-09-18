@@ -1,0 +1,21 @@
+---
+import { Icon } from 'astro-icon/components';
+import Base from '../layouts/Base.astro';
+---
+
+<Base title="Página não encontrada" description="Este endereço não está no arquivo.">
+	<section class="mx-auto max-w-2xl px-4 py-24 text-center">
+		<p class="text-xs uppercase tracking-[0.22em] text-ochre">404</p>
+		<h1 class="mt-4 font-serif text-5xl tracking-tight">Essa banda ainda não está no mapa.</h1>
+		<p class="mt-4 text-ink/65">O endereço não existe, foi movido ou nunca entrou no arquivo.</p>
+		<div class="mt-8 flex justify-center gap-3">
+			<a href="/" class="inline-flex items-center gap-2 rounded-full bg-ink px-5 py-3 text-sm text-paper">
+				<Icon name="lucide:arrow-left" class="size-4" />
+				Voltar ao arquivo
+			</a>
+			<a href="/contribuicao" class="inline-flex items-center gap-2 rounded-full border border-ink/15 px-5 py-3 text-sm">
+				Enviar um artigo
+			</a>
+		</div>
+	</section>
+</Base>

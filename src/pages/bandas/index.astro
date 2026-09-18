@@ -1,0 +1,37 @@
+---
+import BandCard from '../../components/BandCard.astro';
+import SearchForm from '../../components/SearchForm.astro';
+import Base from '../../layouts/Base.astro';
+import { buscaBandas, getBandas } from '../../lib/bandas';
+
+const query = Astro.url.searchParams.get('q') ?? '';
+const bandas = buscaBandas(await getBandas(), query);
+---
+
+<Base
+	title={query ? `Busca: ${query}` : 'Bandas'}
+	description="Todas as bandas do arquivo, com busca por nome, cidade, estado e gênero."
+>
+	<section class="mx-auto max-w-6xl px-4 py-16 md:px-6">
+		<p class="text-xs uppercase tracking-[0.22em] text-ochre">acervo</p>
+		<h1 class="mt-3 font-serif text-5xl tracking-tight">Todas as bandas</h1>
+		<div class="mt-8 max-w-2xl">
+			<SearchForm query={query} />
+		</div>
+		<p class="mt-6 text-sm text-ink/50">
+			{bandas.length} {bandas.length === 1 ? 'entrada' : 'entradas'}
+			{query && <> para “{query}”</>}
+		</p>
+		<div id="resultados" class="mt-8 grid gap-5 md:grid-cols-2">
+			{
+				bandas.length > 0 ? (
+					bandas.map((banda) => <BandCard banda={banda} />)
+				) : (
+					<p class="rounded-2xl border border-dashed border-ink/15 p-8 text-ink/60">
+						Nada encontrado. Tente outro nome, cidade ou gênero.
+					</p>
+				)
+			}
+		</div>
+	</section>
+</Base>

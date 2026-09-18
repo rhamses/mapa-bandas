@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /partials/
+
+Sitemap: https://mapa-bandas.rhamses.workers.dev/sitemap-index.xml

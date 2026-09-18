@@ -1,0 +1,37 @@
+---
+import { Icon } from 'astro-icon/components';
+import { site } from '../lib/site';
+
+const { title, description, permalink, type = 'website' } = Astro.props;
+
+interface Props {
+	title?: string;
+	description?: string;
+	permalink?: string;
+	type?: 'website' | 'article';
+}
+
+const pageTitle = title ? `${title} · ${site.nome}` : `${site.nome} · ${site.tagline}`;
+const pageDescription = description ?? site.descricao;
+const canonical = new URL(permalink ?? Astro.url.pathname, Astro.site ?? site.url).href;
+---
+
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>{pageTitle}</title>
+<meta name="description" content={pageDescription} />
+<meta name="generator" content={Astro.generator} />
+<link rel="canonical" href={canonical} />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="alternate" type="application/rss+xml" title={site.nome} href={site.rss} />
+<meta property="og:site_name" content={site.nome} />
+<meta property="og:title" content={pageTitle} />
+<meta property="og:description" content={pageDescription} />
+<meta property="og:type" content={type} />
+<meta property="og:url" content={canonical} />
+<meta property="og:locale" content="pt_BR" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content={pageTitle} />
+<meta name="twitter:description" content={pageDescription} />
+<meta name="theme-color" content="#14110e" />
+<link rel="sitemap" href="/sitemap-index.xml" />

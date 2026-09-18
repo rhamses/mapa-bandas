@@ -1,0 +1,39 @@
+---
+import Footer from '../components/Footer.astro';
+import Header from '../components/Header.astro';
+import Seo from '../components/Seo.astro';
+import '../styles/global.css';
+
+interface Props {
+	title?: string;
+	description?: string;
+	permalink?: string;
+	type?: 'website' | 'article';
+}
+
+const { title, description, permalink, type } = Astro.props;
+---
+
+<!doctype html>
+<html lang="pt-BR">
+	<head>
+		<Seo title={title} description={description} permalink={permalink} type={type} />
+	</head>
+	<body class="grain min-h-dvh bg-paper font-sans text-ink">
+		<a
+			href="#conteudo"
+			class="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:bg-ink focus:px-4 focus:py-2 focus:text-paper"
+		>
+			Pular para o conteúdo
+		</a>
+		<Header />
+		<main id="conteudo">
+			<slot />
+		</main>
+		<Footer />
+		<script>
+			import htmx from 'htmx.org';
+			window.htmx = htmx;
+		</script>
+	</body>
+</html>

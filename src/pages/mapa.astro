@@ -1,0 +1,102 @@
+---
+import { Icon } from 'astro-icon/components';
+import MapaLayout from '../layouts/Mapa.astro';
+import { getBandas, toMapaFeatures } from '../lib/bandas';
+
+const bandas = await getBandas();
+const geojson = toMapaFeatures(bandas);
+---
+
+<MapaLayout title="Mapa" description="Mapa em tela cheia das bandas locais do Brasil. Dê zoom para revelar os pins e abra o arquivo de cada cidade.">
+	<div class="absolute inset-0 z-0">
+		<div id="mapa" class="h-full w-full"></div>
+	</div>
+
+	<div class="pointer-events-none absolute bottom-6 left-4 z-20 max-w-sm rounded-2xl border border-white/10 bg-ink/80 p-4 text-sm text-paper/80 backdrop-blur md:left-6">
+		<p class="inline-flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-gold">
+			<Icon name="lucide:map-pin" class="size-3.5" />
+			{bandas.length} bandas no acervo
+		</p>
+		<p class="pointer-events-auto mt-2 leading-relaxed">
+			Quanto mais zoom, mais pins aparecem. Clique em um ponto para ler o arquivo da banda.
+		</p>
+	</div>
+
+	<div
+		id="mapa-aviso"
+		class="absolute inset-0 z-20 hidden place-items-center bg-ink px-6 text-center"
+	>
+		<div class="max-w-lg">
+			<p class="text-xs uppercase tracking-[0.22em] text-gold">Mapbox</p>
+			<h1 id="mapa-aviso-titulo" class="mt-3 font-serif text-4xl">Falta o token do mapa</h1>
+			<p id="mapa-aviso-texto" class="mt-4 text-paper/70">
+				Crie um token público (começa com <code class="text-gold">pk.</code>) em account.mapbox.com e coloque em
+				<code class="text-gold">PUBLIC_MAPBOX_TOKEN</code> no arquivo <code class="text-gold">.env</code>. Depois reinicie o
+				<code class="text-gold">npm run dev</code>.
+			</p>
+		</div>
+	</div>
+
+	<div
+		id="modal-banda"
+		class="fixed inset-0 z-40 grid place-items-end p-4 md:place-items-center"
+		x-data
+		x-cloak
+		x-show="$store.modal.open"
+		x-transition.opacity
+		@keydown.escape.window="$store.modal.close()"
+	>
+		<button class="absolute inset-0 bg-ink/70" type="button" @click="$store.modal.close()" aria-label="Fechar"></button>
+		<article
+			class="relative w-full max-w-lg rounded-3xl border border-white/10 bg-paper p-6 text-ink shadow-2xl md:p-8"
+			x-show="$store.modal.open"
+			x-transition
+			@click.outside="$store.modal.close()"
+			role="dialog"
+			aria-modal="true"
+			:aria-labelledby="$store.modal.banda ? 'modal-titulo' : null"
+		>
+			<button
+				type="button"
+				class="absolute right-4 top-4 rounded-full p-2 text-ink/50 hover:bg-ink/5 hover:text-ink"
+				@click="$store.modal.close()"
+				aria-label="Fechar modal"
+			>
+				<Icon name="lucide:x" class="size-5" />
+			</button>
+			<template x-if="$store.modal.banda">
+				<div>
+					<p class="text-[11px] uppercase tracking-[0.22em] text-ochre">
+						<span x-text="$store.modal.banda.cidade"></span>,
+						<span x-text="$store.modal.banda.uf"></span>
+						·
+						<span x-text="$store.modal.banda.formacao"></span>
+					</p>
+					<h2 id="modal-titulo" class="mt-3 font-serif text-4xl tracking-tight" x-text="$store.modal.banda.nome"></h2>
+					<p class="mt-2 text-xs uppercase tracking-[0.16em] text-ink/45" x-text="$store.modal.banda.generos"></p>
+					<p class="mt-4 text-sm leading-relaxed text-ink/70" x-text="$store.modal.banda.resumo"></p>
+					<a
+						class="mt-6 inline-flex items-center gap-2 rounded-full bg-ink px-5 py-3 text-sm text-paper hover:bg-ochre"
+						:href="$store.modal.banda.url"
+					>
+						Abrir o artigo
+						<Icon name="lucide:arrow-right" class="size-4" />
+					</a>
+				</div>
+			</template>
+		</article>
+	</div>
+
+	<script>
+		import { PUBLIC_MAPBOX_TOKEN } from 'astro:env/client';
+		import { initMapa } from '../scripts/mapa';
+
+		const node = document.getElementById('bandas-geojson');
+		const geojson = node ? JSON.parse(node.textContent || '{"type":"FeatureCollection","features":[]}') : { type: 'FeatureCollection', features: [] };
+		initMapa({
+			token: PUBLIC_MAPBOX_TOKEN,
+			geojson,
+		});
+	</script>
+	<script type="application/json" id="bandas-geojson" set:html={JSON.stringify(geojson)} />
+</MapaLayout>
