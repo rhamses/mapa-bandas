@@ -179,13 +179,7 @@ export async function POST({ request }: { request: Request }) {
 		return html('Não foi possível salvar a contribuição agora. Tente de novo em instantes.', false);
 	}
 
-<<<<<<< HEAD
-	return html(
-		'Recebemos sua contribuição. Ela entrou em revisão e, depois de aprovada, aparece no arquivo.',
-		true,
-=======
 	return successTrigger(
 		'Recebemos sua contribuição. Ela entrou em revisão e, depois de aprovada, aparece no arquivo.',
->>>>>>> origin/main
 	);
 }
