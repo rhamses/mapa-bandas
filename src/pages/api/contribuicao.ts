@@ -169,7 +169,7 @@ export async function POST({ request }: { request: Request }) {
 	}
 
 	return html(
-		'Recebemos sua contribuição. O artigo em Markdown já entrou no arquivo ao vivo — sem precisar rebuildar o site.',
+		'Recebemos sua contribuição. Ela entrou na fila de revisão e, após aprovação, aparece no arquivo ao vivo — sem rebuild.',
 		true,
 	);
 }

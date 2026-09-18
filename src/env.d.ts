@@ -11,3 +11,12 @@ interface ImportMeta {
 interface Window {
 	htmx: typeof import('htmx.org').default;
 }
+
+declare namespace App {
+	interface Locals {
+		admin?: {
+			user: string;
+			createdAt: string;
+		};
+	}
+}

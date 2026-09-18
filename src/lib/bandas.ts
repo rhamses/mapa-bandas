@@ -164,7 +164,7 @@ export async function getBandas(): Promise<Banda[]> {
 	}
 
 	try {
-		const submissoes = await listSubmissaoMarkdown();
+		const submissoes = await listSubmissaoMarkdown({ statuses: ['aprovada'] });
 		for (const item of submissoes) {
 			const entry = entryFromMarkdown(item.id, item.markdown, 'submissao');
 			if (!entry) continue;

@@ -56,13 +56,20 @@ npm run dev
 | `/mapa` | Mapa do Brasil em tela cheia |
 | `/bandas` | Listagem completa |
 | `/bandas/[id]` | Artigo da banda |
-| `/contribuicao` | Submissão pública de artigo |
+| `/contribuicao` | Submissão pública de artigo (entra em revisão) |
+| `/admin` | Painel para aprovar, rejeitar ou excluir contribuições |
 | `/rss.xml` | Feed das entradas |
 | `/sitemap-index.xml` | Sitemap |
 
+## Admin
+
+Painel em `/admin` (login em `/admin/login`). Novas contribuições ficam **pendentes** até aprovação; só as aprovadas entram no arquivo público. Submissões antigas sem status continuam publicadas.
+
+Credenciais: usuário `admin` (variável `ADMIN_USER`). A senha é validada por `ADMIN_PASSWORD` (secret) ou pelo par `ADMIN_PASSWORD_SALT` + `ADMIN_PASSWORD_HASH` em `wrangler.jsonc`. Sessões ficam no KV `SESSION`.
+
 ## Conteúdo
 
-As bandas do acervo inicial ficam em `src/content/bandas/` como Markdown. O site carrega esse acervo **e** as contribuições em runtime (SSR), então novos envios aparecem sem rebuild.
+As bandas do acervo inicial ficam em `src/content/bandas/` como Markdown. O site carrega esse acervo **e** as contribuições **aprovadas** em runtime (SSR), então novos envios publicados aparecem sem rebuild.
 
 Cada contribuição pública:
 
@@ -70,3 +77,4 @@ Cada contribuição pública:
 2. Se houver imagem, grava em `data/submissoes/imagens/`
 3. Também persiste no KV `SUBMISSOES` (necessário no deploy Cloudflare, onde o disco do Worker não é permanente)
 4. Serve imagens em `/media/submissoes/:id`
+5. Entra como `pendente` até o admin aprovar em `/admin`
