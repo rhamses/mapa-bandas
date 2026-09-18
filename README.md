@@ -45,10 +45,16 @@ Já conectado no dashboard. Em cada push em `main`:
 Nome: **`PUBLIC_MAPBOX_TOKEN`**  
 Valor: o token público do Mapbox (começa com `pk.`)
 
-Cadastre em dois lugares no dashboard da Cloudflare (conta do Worker `mapa-bandas`):
+**Não** coloque essa variável no `wrangler.jsonc` — se estiver vazia no arquivo, o deploy pode apagar o valor do dashboard. Cadastre só no Cloudflare:
 
-1. **Workers Builds → Settings → Variables** — disponível no `npm run build`
-2. **Worker → Settings → Variables and Secrets** — binding de runtime (mesmo nome; o `wrangler.jsonc` já declara a var)
+1. **Workers Builds → Variables** (ou Secrets do build) — o `npm run build` precisa dela para embutir o token no front
+2. **Worker → Settings → Variables and Secrets** — como **Secret**, para o runtime não sobrescrever
+
+Deploy command recomendado (preserva vars do dashboard):
+
+```sh
+npx wrangler deploy --keep-vars
+```
 
 Localmente continue usando `.env` / `.dev.vars`.
 
