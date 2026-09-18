@@ -1,5 +1,5 @@
 import { parseMarkdown } from './markdown';
-import { isSeedId } from './seed';
+import { isSeedId, listSeedMarkdown } from './seed';
 import { ensureSeedSubmissoes, listSubmissaoMarkdown } from './submissoes';
 
 export type BandaData = {
@@ -145,18 +145,28 @@ export function sortByRecentes(bandas: Banda[]) {
 
 export async function getBandas(): Promise<Banda[]> {
 	const byId = new Map<string, Banda>();
+	let d1Ok = false;
 
 	try {
 		await ensureSeedSubmissoes();
 		const submissoes = await listSubmissaoMarkdown({ statuses: ['aprovada'] });
+		d1Ok = true;
 		for (const item of submissoes) {
 			const origem: Banda['origem'] = isSeedId(item.id) ? 'acervo' : 'submissao';
 			const entry = entryFromMarkdown(item.id, item.markdown, origem);
 			if (!entry) continue;
 			byId.set(entry.id, entry);
 		}
-	} catch {
-		// KV/FS indisponível
+	} catch (error) {
+		console.error('Falha ao carregar bandas do D1', error);
+	}
+
+	// Se o D1 estiver indisponível (ex.: free-tier esgotado), usa o seed do bundle
+	if (!d1Ok) {
+		for (const { id, markdown } of listSeedMarkdown()) {
+			const entry = entryFromMarkdown(id, markdown, 'acervo');
+			if (entry) byId.set(entry.id, entry);
+		}
 	}
 
 	return sortByRecentes([...byId.values()]);
