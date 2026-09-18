@@ -5,11 +5,18 @@ import Admin from '../../layouts/Admin.astro';
 import { isSeedId } from '../../lib/seed';
 import { listSubmissoesAdmin, type SubmissaoStatus } from '../../lib/submissoes';
 
+const PAGE_SIZE = 10;
+
 const session = Astro.locals.admin!;
 const filtro = (Astro.url.searchParams.get('status') ?? 'todas') as SubmissaoStatus | 'todas';
 const todas = await listSubmissoesAdmin();
-const items =
+const filtradas =
 	filtro === 'todas' ? todas : todas.filter((item) => item.meta.status === filtro);
+
+const totalPages = Math.max(1, Math.ceil(filtradas.length / PAGE_SIZE));
+const pageParam = Number.parseInt(Astro.url.searchParams.get('page') ?? '1', 10);
+const pagina = Number.isFinite(pageParam) ? Math.min(Math.max(1, pageParam), totalPages) : 1;
+const items = filtradas.slice((pagina - 1) * PAGE_SIZE, pagina * PAGE_SIZE);
 
 const contagem = {
 	todas: todas.length,
@@ -36,6 +43,18 @@ function formatDate(iso: string) {
 	if (Number.isNaN(d.valueOf())) return iso;
 	return d.toLocaleString('pt-BR', { timeZone: 'UTC' });
 }
+
+function adminHref(options: { status?: typeof filtro; page?: number }) {
+	const params = new URLSearchParams();
+	const status = options.status ?? filtro;
+	if (status !== 'todas') params.set('status', status);
+	if (options.page && options.page > 1) params.set('page', String(options.page));
+	const query = params.toString();
+	return query ? `/admin?${query}` : '/admin';
+}
+
+const from = filtradas.length === 0 ? 0 : (pagina - 1) * PAGE_SIZE + 1;
+const to = Math.min(pagina * PAGE_SIZE, filtradas.length);
 ---
 
 <Admin title="Contribuições" user={session.user}>
@@ -54,7 +73,7 @@ function formatDate(iso: string) {
 		{
 			(['todas', 'pendente', 'aprovada', 'rejeitada'] as const).map((key) => (
 				<a
-					href={key === 'todas' ? '/admin' : `/admin?status=${key}`}
+					href={adminHref({ status: key, page: 1 })}
 					class:list={[
 						'rounded-full px-4 py-2 text-sm transition',
 						filtro === key
@@ -71,13 +90,17 @@ function formatDate(iso: string) {
 	<div id="admin-flash" class="mt-6"></div>
 
 	{
-		items.length === 0 ? (
+		filtradas.length === 0 ? (
 			<p class="mt-10 rounded-3xl border border-dashed border-ink/15 px-6 py-16 text-center text-ink/55">
 				Nenhuma contribuição neste filtro.
 			</p>
 		) : (
-			<ul class="mt-8 grid gap-5">
-				{items.map((item) => (
+			<>
+				<p class="mt-8 text-sm text-ink/50">
+					Mostrando {from}–{to} de {filtradas.length}
+				</p>
+				<ul class="mt-4 grid gap-5">
+					{items.map((item) => (
 					<li class="rounded-3xl border border-ink/10 bg-white/50 p-5 md:p-6">
 						<div class="flex flex-wrap items-start justify-between gap-3">
 							<div>
@@ -209,8 +232,43 @@ function formatDate(iso: string) {
 							</button>
 						</div>
 					</li>
-				))}
-			</ul>
+					))}
+				</ul>
+
+				{
+					totalPages > 1 && (
+						<nav class="mt-10 flex flex-wrap items-center justify-between gap-4" aria-label="Paginação">
+							<a
+								href={pagina > 1 ? adminHref({ page: pagina - 1 }) : undefined}
+								aria-disabled={pagina <= 1 ? 'true' : undefined}
+								class:list={[
+									'rounded-full border px-4 py-2 text-sm transition',
+									pagina <= 1
+										? 'pointer-events-none border-ink/10 text-ink/30'
+										: 'border-ink/15 text-ink/70 hover:border-ochre hover:text-ochre',
+								]}
+							>
+								Anterior
+							</a>
+							<p class="text-sm text-ink/55">
+								Página {pagina} de {totalPages}
+							</p>
+							<a
+								href={pagina < totalPages ? adminHref({ page: pagina + 1 }) : undefined}
+								aria-disabled={pagina >= totalPages ? 'true' : undefined}
+								class:list={[
+									'rounded-full border px-4 py-2 text-sm transition',
+									pagina >= totalPages
+										? 'pointer-events-none border-ink/10 text-ink/30'
+										: 'border-ink/15 text-ink/70 hover:border-ochre hover:text-ochre',
+								]}
+							>
+								Próxima
+							</a>
+						</nav>
+					)
+				}
+			</>
 		)
 	}
 </Admin>
