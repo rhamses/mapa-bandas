@@ -73,12 +73,24 @@ const anoMax = formacoes.length ? Math.max(...formacoes) : anoAtual;
 		</div>
 	</div>
 
-	<div class="pointer-events-none absolute bottom-6 left-4 z-20 max-w-sm rounded-2xl border border-white/10 bg-ink/80 p-4 text-sm text-paper/80 backdrop-blur md:left-6">
+	<div
+		id="aviso-acervo"
+		class="pointer-events-auto absolute bottom-6 left-4 z-20 max-w-sm rounded-2xl border border-white/10 bg-ink/80 p-4 pr-11 text-sm text-paper/80 backdrop-blur md:left-6"
+		hidden
+	>
+		<button
+			id="aviso-acervo-fechar"
+			type="button"
+			class="absolute right-2.5 top-2.5 rounded-full p-1.5 text-paper/45 transition hover:bg-white/10 hover:text-paper"
+			aria-label="Fechar aviso"
+		>
+			<Icon name="lucide:x" class="size-4" />
+		</button>
 		<p class="inline-flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-gold">
 			<Icon name="lucide:map-pin" class="size-3.5" />
 			{bandas.length} bandas no acervo
 		</p>
-		<p class="pointer-events-auto mt-2 leading-relaxed">
+		<p class="mt-2 leading-relaxed">
 			Quanto mais zoom, mais pontos aparecem. Clique em um deles para ler o arquivo da banda.
 		</p>
 	</div>
@@ -148,6 +160,24 @@ const anoMax = formacoes.length ? Math.max(...formacoes) : anoAtual;
 
 	<script is:inline define:vars={{ mapboxToken }}>
 		window.__MAPBOX_TOKEN__ = mapboxToken || '';
+	</script>
+	<script is:inline>
+		(function () {
+			var KEY = 'mapa-bandas:aviso-acervo-dismissed';
+			var aviso = document.getElementById('aviso-acervo');
+			var fechar = document.getElementById('aviso-acervo-fechar');
+			if (!aviso || !fechar) return;
+			try {
+				if (localStorage.getItem(KEY) === '1') return;
+			} catch (_) {}
+			aviso.hidden = false;
+			fechar.addEventListener('click', function () {
+				aviso.hidden = true;
+				try {
+					localStorage.setItem(KEY, '1');
+				} catch (_) {}
+			});
+		})();
 	</script>
 	<script>
 		import { initMapa } from '../scripts/mapa';
