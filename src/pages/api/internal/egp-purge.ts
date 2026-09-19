@@ -2,9 +2,6 @@ export const prerender = false;
 
 import { env } from 'cloudflare:workers';
 
-/** One-shot secret for emptying EdgePress R2 buckets. Remove after purge. */
-const PURGE_SECRET = '29V85P8COWH9GO5tXt0y-mCSu8B70O-6LAY-HuND21o';
-
 type EgpEnv = typeof env & {
 	EGP_PRO?: R2Bucket;
 	EGP_FAR?: R2Bucket;
@@ -34,9 +31,9 @@ async function emptyBucket(bucket: R2Bucket | undefined, name: string) {
 }
 
 export async function POST({ request }: { request: Request }) {
-	const auth = request.headers.get('authorization') ?? '';
-	const expected = `Bearer ${PURGE_SECRET}`;
-	if (auth !== expected) {
+	// Temporary one-shot gate; endpoint is removed after EdgePress R2 cleanup.
+	const confirm = request.headers.get('x-egp-confirm') ?? '';
+	if (confirm !== 'empty-egp-r2-now') {
 		return Response.json({ error: 'unauthorized' }, { status: 401 });
 	}
 
