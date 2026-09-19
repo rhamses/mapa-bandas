@@ -21,17 +21,41 @@ declare global {
 	}
 }
 
+type MapaFeature = {
+	type: 'Feature';
+	geometry: { type: 'Point'; coordinates: [number, number] };
+	properties: Record<string, string | number | null>;
+};
+
+type MapaGeoJSON = {
+	type: 'FeatureCollection';
+	features: MapaFeature[];
+};
+
 type MapOptions = {
 	token: string;
-	geojson: {
-		type: 'FeatureCollection';
-		features: Array<{
-			type: 'Feature';
-			geometry: { type: 'Point'; coordinates: [number, number] };
-			properties: Record<string, string | number | null>;
-		}>;
-	};
+	geojson: MapaGeoJSON;
+	anoMin: number;
+	anoMax: number;
 };
+
+function formacaoAno(feature: MapaFeature) {
+	return Number(feature.properties.formacao);
+}
+
+function filtrarPorAno(geojson: MapaGeoJSON, de: number, ate: number): MapaGeoJSON {
+	return {
+		type: 'FeatureCollection',
+		features: geojson.features.filter((feature) => {
+			const ano = formacaoAno(feature);
+			return Number.isFinite(ano) && ano >= de && ano <= ate;
+		}),
+	};
+}
+
+function formatarIntervalo(de: number, ate: number) {
+	return de === ate ? String(de) : `${de} – ${ate}`;
+}
 
 function showAviso(titulo: string, texto: string) {
 	const aviso = document.getElementById('mapa-aviso');
@@ -44,7 +68,7 @@ function showAviso(titulo: string, texto: string) {
 	aviso.classList.add('grid');
 }
 
-export function initMapa({ token, geojson }: MapOptions) {
+export function initMapa({ token, geojson, anoMin, anoMax }: MapOptions) {
 	const container = document.getElementById('mapa');
 	if (!container) return;
 
@@ -95,11 +119,70 @@ export function initMapa({ token, geojson }: MapOptions) {
 		'bottom-left',
 	);
 
+	let anoDe = anoMin;
+	let anoAte = anoMax;
+
+	const minInput = document.getElementById('filtro-ano-min') as HTMLInputElement | null;
+	const maxInput = document.getElementById('filtro-ano-max') as HTMLInputElement | null;
+	const labelEl = document.getElementById('filtro-ano-label');
+	const contagemEl = document.getElementById('filtro-ano-contagem');
+	const trackFill = document.getElementById('filtro-ano-fill');
+
+	function sincronizarSlider() {
+		if (minInput) {
+			minInput.value = String(anoDe);
+			minInput.style.zIndex = anoDe >= anoAte - 1 ? '4' : '3';
+		}
+		if (maxInput) {
+			maxInput.value = String(anoAte);
+			maxInput.style.zIndex = '3';
+		}
+		if (labelEl) labelEl.textContent = formatarIntervalo(anoDe, anoAte);
+
+		const span = Math.max(anoMax - anoMin, 1);
+		const left = ((anoDe - anoMin) / span) * 100;
+		const right = ((anoAte - anoMin) / span) * 100;
+		if (trackFill) {
+			trackFill.style.left = `${left}%`;
+			trackFill.style.width = `${Math.max(right - left, 0)}%`;
+		}
+
+		const filtrado = filtrarPorAno(geojson, anoDe, anoAte);
+		if (contagemEl) {
+			const n = filtrado.features.length;
+			contagemEl.textContent = n === 1 ? '1 banda' : `${n} bandas`;
+		}
+		return filtrado;
+	}
+
+	function aplicarFiltro() {
+		const filtrado = sincronizarSlider();
+		const source = map.getSource('bandas') as mapboxgl.GeoJSONSource | undefined;
+		if (!source) return;
+		source.setData(filtrado);
+	}
+
+	function onMinChange() {
+		if (!minInput) return;
+		anoDe = Math.min(Number(minInput.value), anoAte);
+		aplicarFiltro();
+	}
+
+	function onMaxChange() {
+		if (!maxInput) return;
+		anoAte = Math.max(Number(maxInput.value), anoDe);
+		aplicarFiltro();
+	}
+
+	minInput?.addEventListener('input', onMinChange);
+	maxInput?.addEventListener('input', onMaxChange);
+	sincronizarSlider();
+
 	map.on('load', () => {
 		map.resize();
 		map.addSource('bandas', {
 			type: 'geojson',
-			data: geojson,
+			data: filtrarPorAno(geojson, anoDe, anoAte),
 			cluster: true,
 			clusterMaxZoom: 11,
 			clusterRadius: 56,
