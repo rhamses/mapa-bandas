@@ -34,7 +34,7 @@ const anoMax = formacoes.length ? Math.max(...formacoes) : anoAtual;
 
 	<div
 		id="filtro-ano"
-		class="pointer-events-auto absolute inset-x-0 bottom-0 z-20 flex h-[50dvh] max-h-[50dvh] flex-col rounded-t-3xl border border-white/10 bg-ink/90 p-5 pt-4 text-paper shadow-lg backdrop-blur md:inset-x-auto md:bottom-auto md:left-6 md:top-20 md:h-auto md:max-h-none md:w-full md:max-w-md md:rounded-2xl md:p-4"
+		class="pointer-events-auto absolute inset-x-0 bottom-0 z-30 flex h-[50dvh] max-h-[50dvh] flex-col rounded-t-3xl border border-white/10 bg-ink/95 p-5 pt-4 text-paper shadow-lg backdrop-blur md:inset-x-auto md:bottom-auto md:left-6 md:top-20 md:z-20 md:h-auto md:max-h-none md:w-full md:max-w-md md:rounded-2xl md:bg-ink/90 md:p-4"
 		hidden
 		role="dialog"
 		aria-label="Filtro por ano de formação"
@@ -193,11 +193,15 @@ const anoMax = formacoes.length ? Math.max(...formacoes) : anoAtual;
 			var fechar = document.getElementById('aviso-acervo-fechar');
 			if (!aviso || !fechar) return;
 			try {
-				if (localStorage.getItem(KEY) === '1') return;
+				if (localStorage.getItem(KEY) === '1') {
+					aviso.setAttribute('data-dismissed', '1');
+					return;
+				}
 			} catch (_) {}
 			aviso.hidden = false;
 			fechar.addEventListener('click', function () {
 				aviso.hidden = true;
+				aviso.setAttribute('data-dismissed', '1');
 				try {
 					localStorage.setItem(KEY, '1');
 				} catch (_) {}
@@ -209,12 +213,16 @@ const anoMax = formacoes.length ? Math.max(...formacoes) : anoAtual;
 			var painel = document.getElementById('filtro-ano');
 			var abrir = document.getElementById('filtro-ano-abrir');
 			var fechar = document.getElementById('filtro-ano-fechar');
+			var aviso = document.getElementById('aviso-acervo');
 			if (!painel || !abrir || !fechar) return;
 
 			function setAberto(aberto) {
 				painel.hidden = !aberto;
 				abrir.hidden = aberto;
 				abrir.setAttribute('aria-expanded', aberto ? 'true' : 'false');
+				if (aviso && !aviso.hasAttribute('data-dismissed')) {
+					aviso.hidden = aberto;
+				}
 			}
 
 			abrir.addEventListener('click', function () {
