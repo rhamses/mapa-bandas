@@ -43,18 +43,18 @@ function formacaoAno(feature: MapaFeature) {
 	return Number(feature.properties.formacao);
 }
 
-function filtrarPorAno(geojson: MapaGeoJSON, de: number, ate: number): MapaGeoJSON {
+function filtrarPorAno(geojson: MapaGeoJSON, ate: number): MapaGeoJSON {
 	return {
 		type: 'FeatureCollection',
 		features: geojson.features.filter((feature) => {
 			const ano = formacaoAno(feature);
-			return Number.isFinite(ano) && ano >= de && ano <= ate;
+			return Number.isFinite(ano) && ano <= ate;
 		}),
 	};
 }
 
-function formatarIntervalo(de: number, ate: number) {
-	return de === ate ? String(de) : `${de} – ${ate}`;
+function formatarAte(ate: number) {
+	return `Até ${ate}`;
 }
 
 function showAviso(titulo: string, texto: string) {
@@ -119,20 +119,17 @@ export function initMapa({ token, geojson, anoMin, anoMax }: MapOptions) {
 		'bottom-left',
 	);
 
-	let anoDe = anoMin;
 	let anoAte = anoMax;
 
-	const minInput = document.getElementById('filtro-ano-min') as HTMLInputElement | null;
-	const maxInput = document.getElementById('filtro-ano-max') as HTMLInputElement | null;
+	const ateInput = document.getElementById('filtro-ano-ate') as HTMLInputElement | null;
 	const labelEl = document.getElementById('filtro-ano-label');
 	const contagemEl = document.getElementById('filtro-ano-contagem');
 
 	function sincronizarSlider() {
-		if (minInput) minInput.value = String(anoDe);
-		if (maxInput) maxInput.value = String(anoAte);
-		if (labelEl) labelEl.textContent = formatarIntervalo(anoDe, anoAte);
+		if (ateInput) ateInput.value = String(anoAte);
+		if (labelEl) labelEl.textContent = formatarAte(anoAte);
 
-		const filtrado = filtrarPorAno(geojson, anoDe, anoAte);
+		const filtrado = filtrarPorAno(geojson, anoAte);
 		if (contagemEl) {
 			const n = filtrado.features.length;
 			contagemEl.textContent = n === 1 ? '1 banda' : `${n} bandas`;
@@ -147,27 +144,21 @@ export function initMapa({ token, geojson, anoMin, anoMax }: MapOptions) {
 		source.setData(filtrado);
 	}
 
-	function onMinChange() {
-		if (!minInput) return;
-		anoDe = Math.min(Number(minInput.value), anoAte);
+	function onAteChange() {
+		if (!ateInput) return;
+		const valor = Number(ateInput.value);
+		anoAte = Math.min(anoMax, Math.max(anoMin, valor));
 		aplicarFiltro();
 	}
 
-	function onMaxChange() {
-		if (!maxInput) return;
-		anoAte = Math.max(Number(maxInput.value), anoDe);
-		aplicarFiltro();
-	}
-
-	minInput?.addEventListener('input', onMinChange);
-	maxInput?.addEventListener('input', onMaxChange);
+	ateInput?.addEventListener('input', onAteChange);
 	sincronizarSlider();
 
 	map.on('load', () => {
 		map.resize();
 		map.addSource('bandas', {
 			type: 'geojson',
-			data: filtrarPorAno(geojson, anoDe, anoAte),
+			data: filtrarPorAno(geojson, anoAte),
 			cluster: true,
 			clusterMaxZoom: 11,
 			clusterRadius: 56,

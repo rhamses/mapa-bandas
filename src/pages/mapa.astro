@@ -55,7 +55,7 @@ const anoMax = formacoes.length ? Math.max(...formacoes) : anoAtual;
 					Formação
 				</p>
 				<p id="filtro-ano-label" class="mt-0.5 font-serif text-xl tracking-tight md:mt-1 md:text-2xl">
-					{anoMin} – {anoMax}
+					Até {anoMax}
 				</p>
 			</div>
 			<p id="filtro-ano-contagem" class="pb-0.5 text-[10px] uppercase tracking-[0.16em] text-paper/55 md:pb-1 md:text-xs">
@@ -65,29 +65,16 @@ const anoMax = formacoes.length ? Math.max(...formacoes) : anoAtual;
 
 		<div class="mt-3 flex min-h-0 flex-1 flex-col justify-center gap-2 md:mt-4 md:flex-none md:justify-start md:gap-0">
 			<label class="block">
-				<span class="text-[10px] uppercase tracking-[0.16em] text-paper/45 md:text-[11px]">De</span>
-				<input
-					id="filtro-ano-min"
-					class="filtro-ano-range mt-1 w-full md:mt-2"
-					type="range"
-					min={anoMin}
-					max={anoMax}
-					value={anoMin}
-					step="1"
-					aria-label="Ano mínimo de formação"
-				/>
-			</label>
-			<label class="mt-0 block md:mt-3">
 				<span class="text-[10px] uppercase tracking-[0.16em] text-paper/45 md:text-[11px]">Até</span>
 				<input
-					id="filtro-ano-max"
+					id="filtro-ano-ate"
 					class="filtro-ano-range mt-1 w-full md:mt-2"
 					type="range"
 					min={anoMin}
 					max={anoMax}
 					value={anoMax}
 					step="1"
-					aria-label="Ano máximo de formação"
+					aria-label="Filtrar até o ano de formação"
 				/>
 			</label>
 
@@ -243,8 +230,8 @@ const anoMax = formacoes.length ? Math.max(...formacoes) : anoAtual;
 		const geojson = node
 			? JSON.parse(node.textContent || '{"type":"FeatureCollection","features":[]}')
 			: { type: 'FeatureCollection', features: [] };
-		const anoMin = Number(document.getElementById('filtro-ano-min')?.getAttribute('min') || 1900);
-		const anoMax = Number(document.getElementById('filtro-ano-max')?.getAttribute('max') || new Date().getFullYear());
+		const anoMin = Number(document.getElementById('filtro-ano-ate')?.getAttribute('min') || 1900);
+		const anoMax = Number(document.getElementById('filtro-ano-ate')?.getAttribute('max') || new Date().getFullYear());
 		initMapa({
 			token: window.__MAPBOX_TOKEN__ || '',
 			geojson,
