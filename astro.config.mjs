@@ -26,6 +26,7 @@ export default defineConfig({
 					'arrow-left',
 					'map-pin',
 					'calendar',
+					'calendar-range',
 					'music',
 					'plus',
 					'x',
