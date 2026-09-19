@@ -126,26 +126,11 @@ export function initMapa({ token, geojson, anoMin, anoMax }: MapOptions) {
 	const maxInput = document.getElementById('filtro-ano-max') as HTMLInputElement | null;
 	const labelEl = document.getElementById('filtro-ano-label');
 	const contagemEl = document.getElementById('filtro-ano-contagem');
-	const trackFill = document.getElementById('filtro-ano-fill');
 
 	function sincronizarSlider() {
-		if (minInput) {
-			minInput.value = String(anoDe);
-			minInput.style.zIndex = anoDe >= anoAte - 1 ? '4' : '3';
-		}
-		if (maxInput) {
-			maxInput.value = String(anoAte);
-			maxInput.style.zIndex = '3';
-		}
+		if (minInput) minInput.value = String(anoDe);
+		if (maxInput) maxInput.value = String(anoAte);
 		if (labelEl) labelEl.textContent = formatarIntervalo(anoDe, anoAte);
-
-		const span = Math.max(anoMax - anoMin, 1);
-		const left = ((anoDe - anoMin) / span) * 100;
-		const right = ((anoAte - anoMin) / span) * 100;
-		if (trackFill) {
-			trackFill.style.left = `${left}%`;
-			trackFill.style.width = `${Math.max(right - left, 0)}%`;
-		}
 
 		const filtrado = filtrarPorAno(geojson, anoDe, anoAte);
 		if (contagemEl) {
