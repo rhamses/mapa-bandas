@@ -26,6 +26,18 @@
 		{
 			"binding": "MEDIA",
 			"bucket_name": "demo-bucket"
+		},
+		{
+			"binding": "EGP_PRO",
+			"bucket_name": "pro-egp-r2"
+		},
+		{
+			"binding": "EGP_FAR",
+			"bucket_name": "far-egp-r2"
+		},
+		{
+			"binding": "EGP_RHA",
+			"bucket_name": "rha-egp-r2"
 		}
 	],
 	"kv_namespaces": [
