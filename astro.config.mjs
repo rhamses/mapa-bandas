@@ -27,6 +27,7 @@ export default defineConfig({
 					'map-pin',
 					'calendar',
 					'calendar-range',
+					'filter',
 					'music',
 					'plus',
 					'x',

@@ -21,17 +21,40 @@ const anoMax = formacoes.length ? Math.max(...formacoes) : anoAtual;
 		<div id="mapa" class="h-full w-full"></div>
 	</div>
 
-	<div
-		class="pointer-events-auto absolute left-4 right-4 top-20 z-20 mx-auto w-full max-w-md rounded-2xl border border-white/10 bg-ink/80 p-4 text-paper shadow-lg backdrop-blur md:left-6 md:right-auto"
-		id="filtro-ano"
+	<button
+		id="filtro-ano-abrir"
+		type="button"
+		class="pointer-events-auto absolute left-4 top-20 z-20 inline-flex size-11 items-center justify-center rounded-full border border-white/15 bg-ink/80 text-paper shadow-lg backdrop-blur transition hover:border-gold/40 hover:text-gold md:left-6"
+		aria-label="Abrir filtro por ano"
+		aria-controls="filtro-ano"
+		aria-expanded="false"
 	>
-		<div class="flex items-end justify-between gap-3">
+		<Icon name="lucide:filter" class="size-5" />
+	</button>
+
+	<div
+		id="filtro-ano"
+		class="pointer-events-auto absolute inset-x-0 bottom-0 z-20 flex h-[50dvh] max-h-[50dvh] flex-col rounded-t-3xl border border-white/10 bg-ink/90 p-5 pt-4 text-paper shadow-lg backdrop-blur md:inset-x-auto md:bottom-auto md:left-6 md:top-20 md:h-auto md:max-h-none md:w-full md:max-w-md md:rounded-2xl md:p-4"
+		hidden
+		role="dialog"
+		aria-label="Filtro por ano de formação"
+	>
+		<button
+			id="filtro-ano-fechar"
+			type="button"
+			class="absolute right-3 top-3 rounded-full p-1.5 text-paper/45 transition hover:bg-white/10 hover:text-paper"
+			aria-label="Fechar filtro"
+		>
+			<Icon name="lucide:x" class="size-4" />
+		</button>
+
+		<div class="flex items-end justify-between gap-3 pr-8">
 			<div>
 				<p class="inline-flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-gold">
 					<Icon name="lucide:calendar-range" class="size-3.5" />
 					Formação
 				</p>
-				<p id="filtro-ano-label" class="mt-1 font-serif text-2xl tracking-tight">
+				<p id="filtro-ano-label" class="mt-1 font-serif text-2xl tracking-tight md:text-2xl">
 					{anoMin} – {anoMax}
 				</p>
 			</div>
@@ -40,36 +63,38 @@ const anoMax = formacoes.length ? Math.max(...formacoes) : anoAtual;
 			</p>
 		</div>
 
-		<label class="mt-4 block">
-			<span class="text-[11px] uppercase tracking-[0.16em] text-paper/45">De</span>
-			<input
-				id="filtro-ano-min"
-				class="filtro-ano-range mt-2 w-full"
-				type="range"
-				min={anoMin}
-				max={anoMax}
-				value={anoMin}
-				step="1"
-				aria-label="Ano mínimo de formação"
-			/>
-		</label>
-		<label class="mt-3 block">
-			<span class="text-[11px] uppercase tracking-[0.16em] text-paper/45">Até</span>
-			<input
-				id="filtro-ano-max"
-				class="filtro-ano-range mt-2 w-full"
-				type="range"
-				min={anoMin}
-				max={anoMax}
-				value={anoMax}
-				step="1"
-				aria-label="Ano máximo de formação"
-			/>
-		</label>
+		<div class="mt-5 flex min-h-0 flex-1 flex-col justify-center gap-4 md:mt-4 md:flex-none md:justify-start md:gap-0">
+			<label class="block">
+				<span class="text-[11px] uppercase tracking-[0.16em] text-paper/45">De</span>
+				<input
+					id="filtro-ano-min"
+					class="filtro-ano-range mt-2 w-full"
+					type="range"
+					min={anoMin}
+					max={anoMax}
+					value={anoMin}
+					step="1"
+					aria-label="Ano mínimo de formação"
+				/>
+			</label>
+			<label class="mt-0 block md:mt-3">
+				<span class="text-[11px] uppercase tracking-[0.16em] text-paper/45">Até</span>
+				<input
+					id="filtro-ano-max"
+					class="filtro-ano-range mt-2 w-full"
+					type="range"
+					min={anoMin}
+					max={anoMax}
+					value={anoMax}
+					step="1"
+					aria-label="Ano máximo de formação"
+				/>
+			</label>
 
-		<div class="mt-1 flex justify-between text-[11px] uppercase tracking-[0.16em] text-paper/45">
-			<span>{anoMin}</span>
-			<span>{anoMax}</span>
+			<div class="mt-1 flex justify-between text-[11px] uppercase tracking-[0.16em] text-paper/45">
+				<span>{anoMin}</span>
+				<span>{anoMax}</span>
+			</div>
 		</div>
 	</div>
 
@@ -176,6 +201,30 @@ const anoMax = formacoes.length ? Math.max(...formacoes) : anoAtual;
 				try {
 					localStorage.setItem(KEY, '1');
 				} catch (_) {}
+			});
+		})();
+	</script>
+	<script is:inline>
+		(function () {
+			var painel = document.getElementById('filtro-ano');
+			var abrir = document.getElementById('filtro-ano-abrir');
+			var fechar = document.getElementById('filtro-ano-fechar');
+			if (!painel || !abrir || !fechar) return;
+
+			function setAberto(aberto) {
+				painel.hidden = !aberto;
+				abrir.hidden = aberto;
+				abrir.setAttribute('aria-expanded', aberto ? 'true' : 'false');
+			}
+
+			abrir.addEventListener('click', function () {
+				setAberto(true);
+			});
+			fechar.addEventListener('click', function () {
+				setAberto(false);
+			});
+			document.addEventListener('keydown', function (event) {
+				if (event.key === 'Escape' && !painel.hidden) setAberto(false);
 			});
 		})();
 	</script>
