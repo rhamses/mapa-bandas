@@ -2,20 +2,31 @@ export const prerender = false;
 
 import { env } from 'cloudflare:workers';
 import { PUBLIC_MAPBOX_TOKEN } from 'astro:env/client';
-import { callMcpTool } from '../../../../mcp/index';
+import { callMcpTool, MAX_AGENT_IMAGES } from '../../../../mcp/index';
 import { getPublicMapboxToken } from '../../../lib/mapbox-token';
 import {
+	clearPendingMedia,
 	getOrCreateSession,
 	isConfirmation,
 	saveSession,
 	sessionCookie,
 	type AgentMessage,
+	type PendingImage,
 } from '../../../lib/agent-session';
 import { missingFields } from '../../../../mcp/schema';
 import { enrichCoords } from '../../../../mcp/geocode';
 
+type ChatImage = {
+	base64?: string;
+	mime?: string;
+	filename?: string;
+	name?: string;
+};
+
 type ChatBody = {
 	message?: string;
+	images?: ChatImage[];
+	/** compat */
 	image_base64?: string;
 	image_mime?: string;
 };
@@ -37,6 +48,37 @@ function push(session: { messages: AgentMessage[] }, role: AgentMessage['role'],
 	}
 }
 
+function normalizeIncomingImages(body: ChatBody): PendingImage[] {
+	const out: PendingImage[] = [];
+	if (Array.isArray(body.images)) {
+		for (const item of body.images) {
+			if (!item?.base64) continue;
+			out.push({
+				base64: item.base64.replace(/^data:[^;]+;base64,/, ''),
+				mime: item.mime || 'image/jpeg',
+				filename: item.filename || item.name,
+			});
+			if (out.length >= MAX_AGENT_IMAGES) break;
+		}
+	}
+	if (out.length === 0 && body.image_base64) {
+		out.push({
+			base64: body.image_base64.replace(/^data:[^;]+;base64,/, ''),
+			mime: body.image_mime || 'image/jpeg',
+		});
+	}
+	return out;
+}
+
+function mergeImages(existing: PendingImage[], incoming: PendingImage[]) {
+	const merged = [...existing];
+	for (const img of incoming) {
+		if (merged.length >= MAX_AGENT_IMAGES) break;
+		merged.push(img);
+	}
+	return merged;
+}
+
 export async function POST({ request }: { request: Request }) {
 	let body: ChatBody;
 	try {
@@ -46,9 +88,9 @@ export async function POST({ request }: { request: Request }) {
 	}
 
 	const message = (body.message ?? '').trim();
-	const hasImage = Boolean(body.image_base64);
-	if (!message && !hasImage) {
-		return json({ error: 'Envie uma mensagem ou imagem.' }, 400);
+	const incomingImages = normalizeIncomingImages(body);
+	if (!message && incomingImages.length === 0) {
+		return json({ error: 'Envie uma mensagem ou uma ou mais imagens.' }, 400);
 	}
 
 	const session = await getOrCreateSession(request);
@@ -58,17 +100,28 @@ export async function POST({ request }: { request: Request }) {
 		ai: aiBinding(),
 	};
 
-	push(session, 'user', message || '(imagem enviada)');
+	const userLabel =
+		message ||
+		(incomingImages.length === 1
+			? '(1 imagem enviada)'
+			: `(${incomingImages.length} imagens enviadas)`);
+	push(session, 'user', userLabel);
 
 	// Confirmação de publicação
 	if (message && isConfirmation(message) && session.pendingDraft) {
+		if (incomingImages.length) {
+			session.pendingImages = mergeImages(session.pendingImages, incomingImages);
+		}
 		const result = await callMcpTool(
 			'aprovar_banda',
 			{
 				draft: session.pendingDraft,
 				confirmacao: message,
-				imagem_base64: session.pendingImageBase64,
-				imagem_mime: session.pendingImageMime,
+				imagens: session.pendingImages.map((img) => ({
+					base64: img.base64,
+					mime: img.mime,
+					filename: img.filename,
+				})),
 			},
 			ctx,
 		);
@@ -77,11 +130,7 @@ export async function POST({ request }: { request: Request }) {
 			? `${result.message}\n\nAbrir ficha: ${result.url}`
 			: result.message;
 		push(session, 'assistant', reply);
-		if (result.ok) {
-			session.pendingDraft = null;
-			session.pendingImageBase64 = undefined;
-			session.pendingImageMime = undefined;
-		}
+		if (result.ok) clearPendingMedia(session);
 		await saveSession(session);
 		return json(
 			{
@@ -90,6 +139,7 @@ export async function POST({ request }: { request: Request }) {
 				pending: false,
 				savedId: result.savedId,
 				url: result.url,
+				imageCount: result.imageCount ?? session.pendingImages.length,
 				messages: session.messages,
 			},
 			200,
@@ -97,8 +147,16 @@ export async function POST({ request }: { request: Request }) {
 		);
 	}
 
-	// Merge de correções curtas no rascunho pendente
-	if (session.pendingDraft && message && !hasImage && message.length < 400 && !isConfirmation(message)) {
+	session.pendingImages = mergeImages(session.pendingImages, incomingImages);
+
+	// Merge de correções curtas no rascunho pendente (sem reextrair tudo)
+	if (
+		session.pendingDraft &&
+		message &&
+		incomingImages.length === 0 &&
+		message.length < 400 &&
+		!isConfirmation(message)
+	) {
 		const merged = await enrichCoords(
 			{ ...session.pendingDraft, ...parseCorrecoes(message, session.pendingDraft) },
 			ctx.mapboxToken,
@@ -110,40 +168,61 @@ export async function POST({ request }: { request: Request }) {
 			const { bandaDraftSchema } = await import('../../../../mcp/schema');
 			const full = bandaDraftSchema.safeParse(merged);
 			if (full.success) {
-				const preview = formatPreview(full.data);
+				const preview = formatPreview(full.data, session.pendingImages.length);
 				session.pendingDraft = full.data;
 				push(session, 'assistant', preview);
 				await saveSession(session);
 				return json(
-					{ reply: preview, preview, pending: true, messages: session.messages },
+					{
+						reply: preview,
+						preview,
+						pending: true,
+						imageCount: session.pendingImages.length,
+						messages: session.messages,
+					},
 					200,
 					cookie,
 				);
 			}
 		}
-		const ask = `Atualizei o rascunho. Ainda faltam: ${missing.join(', ') || 'nada'}.`;
+		const ask = `Atualizei o rascunho (${session.pendingImages.length} foto(s)). Ainda faltam: ${missing.join(', ') || 'nada'}.`;
 		push(session, 'assistant', ask);
 		await saveSession(session);
-		return json({ reply: ask, pending: true, draft: merged, messages: session.messages }, 200, cookie);
+		return json(
+			{
+				reply: ask,
+				pending: true,
+				draft: merged,
+				imageCount: session.pendingImages.length,
+				messages: session.messages,
+			},
+			200,
+			cookie,
+		);
 	}
 
 	const result = await callMcpTool(
 		'extrair_banda',
 		{
 			texto: message,
-			imagem_base64: body.image_base64,
-			imagem_mime: body.image_mime,
+			imagens: session.pendingImages.map((img) => ({
+				base64: img.base64,
+				mime: img.mime,
+				filename: img.filename,
+			})),
 		},
 		ctx,
 	);
 
-	session.pendingDraft = result.draft ?? null;
-	if (body.image_base64) {
-		session.pendingImageBase64 = body.image_base64;
-		session.pendingImageMime = body.image_mime || 'image/jpeg';
+	session.pendingDraft = result.draft ?? session.pendingDraft;
+
+	let reply = result.preview || result.message;
+	if (session.pendingImages.length && result.missing && result.missing.length === 0) {
+		// ensure preview reflects current image count (tool already does)
+	} else if (session.pendingImages.length && result.preview && !/Fotos:/.test(result.preview)) {
+		reply += `\n\nFotos no relatório: ${session.pendingImages.length}.`;
 	}
 
-	const reply = result.preview || result.message;
 	push(session, 'assistant', reply);
 	await saveSession(session);
 
@@ -154,6 +233,7 @@ export async function POST({ request }: { request: Request }) {
 			pending: Boolean(result.draft && (!result.missing || result.missing.length === 0)),
 			missing: result.missing,
 			draft: result.draft,
+			imageCount: session.pendingImages.length,
 			messages: session.messages,
 		},
 		200,
@@ -176,11 +256,9 @@ function parseCorrecoes(text: string, current: Record<string, unknown>) {
 	if (autor) out.autor = autor[1]!.trim();
 	if (email) out.email = email[1]!.trim();
 
-	// "artigo: ..." long form
 	const artigo = /artigo\s*[:=]\s*([\s\S]+)/im.exec(text);
 	if (artigo && artigo[1]!.trim().length >= 80) out.artigo = artigo[1]!.trim();
 
-	// If user just pasted a long paragraph while pending, treat as artigo
 	if (!Object.keys(out).length && text.length >= 80) {
 		out.artigo = text;
 		if (!current.resumo) out.resumo = text.slice(0, 177).trim() + '…';

@@ -15,6 +15,8 @@ export type BandaData = {
 	publicadoEm: Date;
 	destaque: boolean;
 	imagem?: string;
+	/** Coleção de fotos do relatório (capa + demais). */
+	imagens?: string[];
 	fontes?: Array<{ titulo: string; url: string }>;
 	autor?: string;
 	/** False = ficha pública mostra “contribuição anônima”. Default true. */
@@ -71,6 +73,14 @@ function coerceBandaData(raw: Record<string, unknown>): BandaData | null {
 				.filter((f): f is { titulo: string; url: string } => Boolean(f))
 		: undefined;
 
+	const imagens = Array.isArray(raw.imagens)
+		? raw.imagens.map(String).map((u) => u.trim()).filter(Boolean)
+		: undefined;
+	const imagem =
+		typeof raw.imagem === 'string' && raw.imagem
+			? raw.imagem
+			: imagens?.[0];
+
 	return {
 		nome: raw.nome,
 		cidade: raw.cidade,
@@ -86,7 +96,8 @@ function coerceBandaData(raw: Record<string, unknown>): BandaData | null {
 		resumo: typeof raw.resumo === 'string' ? raw.resumo : raw.nome,
 		publicadoEm,
 		destaque: Boolean(raw.destaque),
-		imagem: typeof raw.imagem === 'string' && raw.imagem ? raw.imagem : undefined,
+		imagem,
+		imagens: imagens?.length ? imagens : imagem ? [imagem] : undefined,
 		fontes,
 		autor: typeof raw.autor === 'string' ? raw.autor : undefined,
 		creditoPublico: raw.creditoPublico === false ? false : true,

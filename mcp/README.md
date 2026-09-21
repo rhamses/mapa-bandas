@@ -6,8 +6,8 @@ Ferramentas MCP para transformar texto ou imagem em ficha de banda, pedir aprova
 
 | Tool | Descrição |
 |------|-----------|
-| `extrair_banda` | Texto e/ou imagem → rascunho + prévia (não salva) |
-| `aprovar_banda` | Com confirmação `sim`, grava como `aprovada` e aparece no site |
+| `extrair_banda` | Texto e/ou **coleção de imagens** → rascunho + prévia (não salva) |
+| `aprovar_banda` | Com confirmação `sim`, grava como `aprovada` (incluindo as fotos) e aparece no site |
 
 ## Endpoints no site
 

@@ -4,6 +4,16 @@ import { enrichCoords } from './geocode';
 import { draftId, draftToMarkdown, formatPreview } from './format';
 import { saveSubmissao, type ImagemMeta } from '../src/lib/submissoes';
 
+export const MAX_AGENT_IMAGES = 8;
+
+export type McpImageInput = {
+	base64: string;
+	mime?: string;
+	filename?: string;
+};
+
+export type DecodedImage = { bytes: Uint8Array; meta: ImagemMeta };
+
 export type McpToolResult = {
 	ok: boolean;
 	message: string;
@@ -12,6 +22,7 @@ export type McpToolResult = {
 	missing?: string[];
 	savedId?: string;
 	url?: string;
+	imageCount?: number;
 };
 
 export type McpToolContext = {
@@ -23,23 +34,36 @@ export const MCP_TOOLS = [
 	{
 		name: 'extrair_banda',
 		description:
-			'Recebe texto e/ou imagem sobre uma banda brasileira e devolve um rascunho estruturado + prévia para aprovação (ainda não salva).',
+			'Recebe texto e/ou uma coleção de imagens sobre uma banda brasileira e devolve um rascunho estruturado + prévia para aprovação (ainda não salva). As imagens entram no mesmo relatório.',
 		inputSchema: {
 			type: 'object',
 			properties: {
 				texto: { type: 'string', description: 'Texto livre com dados da banda' },
+				imagens: {
+					type: 'array',
+					description: 'Coleção de imagens (até 8) em base64 para o mesmo relatório',
+					items: {
+						type: 'object',
+						properties: {
+							base64: { type: 'string' },
+							mime: { type: 'string' },
+							filename: { type: 'string' },
+						},
+						required: ['base64'],
+					},
+				},
 				imagem_base64: {
 					type: 'string',
-					description: 'Imagem opcional em base64 (jpeg/png/webp)',
+					description: 'Compat: imagem única em base64',
 				},
-				imagem_mime: { type: 'string', description: 'MIME da imagem, ex: image/jpeg' },
+				imagem_mime: { type: 'string', description: 'MIME da imagem única' },
 			},
 		},
 	},
 	{
 		name: 'aprovar_banda',
 		description:
-			'Confirma e grava no banco (status aprovada) um rascunho já validado, para aparecer no site.',
+			'Confirma e grava no banco (status aprovada) um rascunho já validado, incluindo a coleção de imagens do relatório.',
 		inputSchema: {
 			type: 'object',
 			properties: {
@@ -47,6 +71,18 @@ export const MCP_TOOLS = [
 				confirmacao: {
 					type: 'string',
 					description: 'Deve ser "sim" para confirmar',
+				},
+				imagens: {
+					type: 'array',
+					items: {
+						type: 'object',
+						properties: {
+							base64: { type: 'string' },
+							mime: { type: 'string' },
+							filename: { type: 'string' },
+						},
+						required: ['base64'],
+					},
 				},
 				imagem_base64: { type: 'string' },
 				imagem_mime: { type: 'string' },
@@ -56,59 +92,100 @@ export const MCP_TOOLS = [
 	},
 ] as const;
 
-function decodeBase64Image(
+export function decodeBase64Image(
 	base64?: string,
 	mime = 'image/jpeg',
-): { bytes: Uint8Array; meta: ImagemMeta } | null {
+	filename?: string,
+): DecodedImage | null {
 	if (!base64) return null;
 	const cleaned = base64.replace(/^data:[^;]+;base64,/, '');
 	const binary = atob(cleaned);
 	const bytes = new Uint8Array(binary.length);
 	for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-	const ext = mime.includes('png') ? 'png' : mime.includes('webp') ? 'webp' : mime.includes('gif') ? 'gif' : 'jpg';
+	const ext = mime.includes('png')
+		? 'png'
+		: mime.includes('webp')
+			? 'webp'
+			: mime.includes('gif')
+				? 'gif'
+				: 'jpg';
 	return {
 		bytes,
 		meta: {
-			contentType: mime,
-			filename: `agente.${ext}`,
+			contentType: mime || `image/${ext === 'jpg' ? 'jpeg' : ext}`,
+			filename: filename || `agente.${ext}`,
 			ext,
 		},
 	};
 }
 
+export function collectImages(args: {
+	imagens?: unknown;
+	imagem_base64?: string;
+	imagem_mime?: string;
+}): DecodedImage[] {
+	const out: DecodedImage[] = [];
+	if (Array.isArray(args.imagens)) {
+		for (const item of args.imagens) {
+			if (!item || typeof item !== 'object') continue;
+			const row = item as Record<string, unknown>;
+			const base64 = typeof row.base64 === 'string' ? row.base64 : undefined;
+			const mime = typeof row.mime === 'string' ? row.mime : 'image/jpeg';
+			const filename = typeof row.filename === 'string' ? row.filename : undefined;
+			const decoded = decodeBase64Image(base64, mime, filename);
+			if (decoded) out.push(decoded);
+			if (out.length >= MAX_AGENT_IMAGES) break;
+		}
+	}
+	if (out.length === 0 && args.imagem_base64) {
+		const one = decodeBase64Image(args.imagem_base64, args.imagem_mime);
+		if (one) out.push(one);
+	}
+	return out.slice(0, MAX_AGENT_IMAGES);
+}
+
 export async function toolExtrairBanda(
-	args: { texto?: string; imagem_base64?: string; imagem_mime?: string },
+	args: {
+		texto?: string;
+		imagens?: McpImageInput[];
+		imagem_base64?: string;
+		imagem_mime?: string;
+	},
 	ctx: McpToolContext,
 ): Promise<McpToolResult> {
 	const texto = (args.texto ?? '').trim();
-	const image = decodeBase64Image(args.imagem_base64, args.imagem_mime);
-	if (!texto && !image) {
-		return { ok: false, message: 'Envie um texto ou uma imagem sobre a banda.' };
+	const images = collectImages(args);
+	if (!texto && images.length === 0) {
+		return { ok: false, message: 'Envie um texto ou uma ou mais imagens sobre a banda.' };
 	}
 
 	let draft = await extractBandaInput({
-		text: texto || 'Extraia os dados da banda na imagem.',
-		imageBytes: image?.bytes,
+		text: texto || 'Extraia os dados da banda nas imagens enviadas.',
+		imageBytes: images[0]?.bytes,
 		ai: ctx.ai,
 	});
 	draft = await enrichCoords(draft, ctx.mapboxToken);
 
 	const missing = missingFields(draft);
 	const previewCandidate = { ...draft };
-	const previewText =
+	const basePreview =
 		missing.length === 0
-			? formatPreview(bandaDraftSchema.parse(draft) as BandaDraft)
+			? formatPreview(bandaDraftSchema.parse(draft) as BandaDraft, images.length)
 			: [
 					'## Rascunho incompleto',
 					'',
 					'Consegui extrair parte dos dados, mas ainda faltam:',
 					...missing.map((f) => `- ${f}`),
 					'',
+					images.length
+						? `Imagens anexadas ao relatório: ${images.length}.`
+						: 'Nenhuma imagem anexada ainda.',
+					'',
 					'```json',
 					JSON.stringify(previewCandidate, null, 2),
 					'```',
 					'',
-					'Envie as informações que faltam (ou uma imagem/flyer) para eu completar a prévia.',
+					'Envie as informações que faltam (ou mais imagens) para eu completar a prévia.',
 				].join('\n');
 
 	return {
@@ -118,8 +195,9 @@ export async function toolExtrairBanda(
 				? 'Prévia pronta. Confirme com "sim" para publicar no acervo.'
 				: 'Rascunho incompleto — faltam campos.',
 		draft,
-		preview: previewText,
+		preview: basePreview,
 		missing,
+		imageCount: images.length,
 	};
 }
 
@@ -127,6 +205,7 @@ export async function toolAprovarBanda(
 	args: {
 		draft: unknown;
 		confirmacao: string;
+		imagens?: McpImageInput[];
 		imagem_base64?: string;
 		imagem_mime?: string;
 	},
@@ -151,16 +230,16 @@ export async function toolAprovarBanda(
 
 	const draft = parsed.data;
 	const id = draftId(draft);
-	const image = decodeBase64Image(args.imagem_base64, args.imagem_mime);
-	const imagemPath = image ? `/media/submissoes/${id}/0.${image.meta.ext}` : undefined;
-	const markdown = draftToMarkdown(draft, id, imagemPath);
+	const images = collectImages(args);
+	const imagemPaths = images.map((img, index) => `/media/submissoes/${id}/${index}.${img.meta.ext}`);
+	const markdown = draftToMarkdown(draft, id, imagemPaths);
 
 	try {
 		await saveSubmissao({
 			id,
 			markdown,
 			email: draft.email,
-			imagens: image ? [image] : [],
+			imagens: images,
 			status: 'aprovada',
 		});
 	} catch (error) {
@@ -168,12 +247,20 @@ export async function toolAprovarBanda(
 		return { ok: false, message: 'Não foi possível gravar no banco agora. Tente de novo.' };
 	}
 
+	const fotos =
+		images.length === 0
+			? 'sem fotos'
+			: images.length === 1
+				? '1 foto'
+				: `${images.length} fotos`;
+
 	return {
 		ok: true,
-		message: `Publicado: ${draft.nome} já deve aparecer no arquivo e no mapa.`,
+		message: `Publicado: ${draft.nome} (${fotos}) já deve aparecer no arquivo e no mapa.`,
 		savedId: id,
 		url: `/bandas/${id}`,
 		draft,
+		imageCount: images.length,
 	};
 }
 
@@ -182,10 +269,12 @@ export async function callMcpTool(
 	args: Record<string, unknown>,
 	ctx: McpToolContext,
 ): Promise<McpToolResult> {
+	const imagens = Array.isArray(args.imagens) ? (args.imagens as McpImageInput[]) : undefined;
 	if (name === 'extrair_banda') {
 		return toolExtrairBanda(
 			{
 				texto: typeof args.texto === 'string' ? args.texto : '',
+				imagens,
 				imagem_base64: typeof args.imagem_base64 === 'string' ? args.imagem_base64 : undefined,
 				imagem_mime: typeof args.imagem_mime === 'string' ? args.imagem_mime : undefined,
 			},
@@ -197,6 +286,7 @@ export async function callMcpTool(
 			{
 				draft: args.draft,
 				confirmacao: typeof args.confirmacao === 'string' ? args.confirmacao : '',
+				imagens,
 				imagem_base64: typeof args.imagem_base64 === 'string' ? args.imagem_base64 : undefined,
 				imagem_mime: typeof args.imagem_mime === 'string' ? args.imagem_mime : undefined,
 			},

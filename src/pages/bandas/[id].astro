@@ -66,7 +66,42 @@ const jsonLd = {
 			}
 		</div>
 		{
-			banda.data.imagem && (
+			banda.data.imagens && banda.data.imagens.length > 0 ? (
+				banda.data.imagens.length === 1 ? (
+					<figure class="mt-10 overflow-hidden rounded-3xl border border-ink/10">
+						<img
+							src={banda.data.imagens[0]}
+							alt={`Imagem de ${banda.data.nome}`}
+							class="aspect-[16/10] w-full object-cover"
+						/>
+					</figure>
+				) : (
+					<section class="mt-10" aria-label="Fotos do relatório">
+						<p class="text-[11px] uppercase tracking-[0.22em] text-ochre">
+							{banda.data.imagens.length} fotos no relatório
+						</p>
+						<div class="mt-4 grid gap-3 sm:grid-cols-2">
+							{banda.data.imagens.map((src, index) => (
+								<figure
+									class:list={[
+										'overflow-hidden rounded-2xl border border-ink/10',
+										index === 0 && 'sm:col-span-2',
+									]}
+								>
+									<img
+										src={src}
+										alt={`Foto ${index + 1} de ${banda.data.nome}`}
+										class:list={[
+											'w-full object-cover',
+											index === 0 ? 'aspect-[16/10]' : 'aspect-square',
+										]}
+									/>
+								</figure>
+							))}
+						</div>
+					</section>
+				)
+			) : banda.data.imagem ? (
 				<figure class="mt-10 overflow-hidden rounded-3xl border border-ink/10">
 					<img
 						src={banda.data.imagem}
@@ -74,7 +109,7 @@ const jsonLd = {
 						class="aspect-[16/10] w-full object-cover"
 					/>
 				</figure>
-			)
+			) : null
 		}
 		<p class="mt-10 text-xl leading-relaxed text-ink/80">{banda.data.resumo}</p>
 		<div class="prose prose-lg mt-10 max-w-none prose-headings:font-serif prose-a:text-ochre" set:html={banda.html} />

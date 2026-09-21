@@ -11,8 +11,8 @@ import Base from '../layouts/Base.astro';
 			<p class="text-xs uppercase tracking-[0.22em] text-ochre">MCP · agente</p>
 			<h1 class="mt-2 font-serif text-4xl tracking-tight md:text-5xl">Cadastre uma banda em conversa.</h1>
 			<p class="mt-3 max-w-2xl text-sm leading-relaxed text-ink/65">
-				Envie texto ou uma imagem (flyer, ficha, print). O agente monta a ficha, mostra uma prévia e só
-				grava no acervo quando você responder <strong>sim</strong>.
+				Envie texto e uma coleção de imagens (flyer, fotos, prints). O agente monta a ficha, mostra a
+				prévia e só grava no acervo quando você responder <strong>sim</strong>.
 			</p>
 		</header>
 
@@ -27,8 +27,8 @@ import Base from '../layouts/Base.astro';
 				x-ref="scroller"
 			>
 				<div class="rounded-2xl bg-ink/[0.04] px-4 py-3 text-sm leading-relaxed text-ink/75">
-					Olá — sou o agente do Mapa Bandas. Cole a história de uma banda, diga cidade/UF e ano, ou
-					anexe uma imagem. Eu devolvo a prévia; diga <span class="font-medium text-ochre">sim</span> para publicar.
+					Olá — sou o agente do Mapa Bandas. Cole a história de uma banda e anexe várias imagens ao
+					mesmo relatório. Eu devolvo a prévia; diga <span class="font-medium text-ochre">sim</span> para publicar.
 				</div>
 
 				<template x-for="(msg, i) in messages" :key="i">
@@ -47,25 +47,33 @@ import Base from '../layouts/Base.astro';
 			</div>
 
 			<form class="border-t border-ink/10 p-4 md:p-5" @submit.prevent="send">
-				<div
-					class="mb-3 flex items-center gap-3"
-					x-show="imageName"
-					x-cloak
-				>
-					<span class="inline-flex items-center gap-2 rounded-full bg-ochre/10 px-3 py-1 text-xs text-ochre">
-						<Icon name="lucide:image" class="size-3.5" />
-						<span x-text="imageName"></span>
-					</span>
-					<button type="button" class="text-xs text-ink/50 hover:text-ink" @click="clearImage">Remover</button>
+				<div class="mb-3 flex flex-wrap items-center gap-2" x-show="images.length" x-cloak>
+					<template x-for="(img, index) in images" :key="index">
+						<span class="inline-flex items-center gap-2 rounded-full bg-ochre/10 px-3 py-1 text-xs text-ochre">
+							<Icon name="lucide:image" class="size-3.5" />
+							<span class="max-w-[10rem] truncate" x-text="img.name"></span>
+							<button
+								type="button"
+								class="text-ochre/70 hover:text-ochre"
+								@click="removeImage(index)"
+								aria-label="Remover imagem"
+							>
+								<Icon name="lucide:x" class="size-3.5" />
+							</button>
+						</span>
+					</template>
+					<button type="button" class="text-xs text-ink/50 hover:text-ink" @click="clearImages">
+						Limpar
+					</button>
 				</div>
 
 				<div class="flex items-end gap-2">
 					<label
 						class="inline-flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full border border-ink/15 text-ink/60 hover:border-ochre/40 hover:text-ochre"
-						title="Anexar imagem"
+						title="Anexar imagens"
 					>
 						<Icon name="lucide:image-plus" class="size-5" />
-						<input type="file" accept="image/*" class="sr-only" @change="onFile($event)" />
+						<input type="file" accept="image/*" multiple class="sr-only" @change="onFile($event)" />
 					</label>
 					<textarea
 						x-model="input"
@@ -78,13 +86,15 @@ import Base from '../layouts/Base.astro';
 					<button
 						type="submit"
 						class="inline-flex size-11 shrink-0 items-center justify-center rounded-full bg-ink text-paper hover:bg-ochre disabled:opacity-40"
-						:disabled="loading || (!input.trim() && !imageBase64)"
+						:disabled="loading || (!input.trim() && images.length === 0)"
 						aria-label="Enviar"
 					>
 						<Icon name="lucide:send" class="size-4" />
 					</button>
 				</div>
-				<p class="mt-2 text-[11px] text-ink/45">Atalho: Ctrl/⌘ + Enter para enviar.</p>
+				<p class="mt-2 text-[11px] text-ink/45">
+					Até 8 imagens por relatório · Ctrl/⌘ + Enter para enviar.
+				</p>
 			</form>
 		</div>
 	</section>
