@@ -2,8 +2,9 @@ import type { BandaDraft } from './schema';
 import { buildMarkdownFile } from '../src/lib/markdown';
 import { slugifyNome } from '../src/lib/bandas';
 
-export function draftToFrontmatter(draft: BandaDraft, id: string, imagemPath?: string) {
+export function draftToFrontmatter(draft: BandaDraft, id: string, imagemPaths: string[] = []) {
 	const publicadoEm = new Date().toISOString().slice(0, 10);
+	const capa = imagemPaths[0];
 	return {
 		nome: draft.nome,
 		cidade: draft.cidade,
@@ -18,13 +19,14 @@ export function draftToFrontmatter(draft: BandaDraft, id: string, imagemPath?: s
 		destaque: false,
 		autor: draft.autor,
 		creditoPublico: draft.creditoPublico !== false,
-		...(imagemPath ? { imagem: imagemPath } : {}),
+		...(capa ? { imagem: capa } : {}),
+		...(imagemPaths.length ? { imagens: imagemPaths } : {}),
 		...(draft.fontes?.length ? { fontes: draft.fontes } : {}),
 	};
 }
 
-export function draftToMarkdown(draft: BandaDraft, id: string, imagemPath?: string) {
-	return buildMarkdownFile(draftToFrontmatter(draft, id, imagemPath), draft.artigo);
+export function draftToMarkdown(draft: BandaDraft, id: string, imagemPaths: string[] = []) {
+	return buildMarkdownFile(draftToFrontmatter(draft, id, imagemPaths), draft.artigo);
 }
 
 export function draftId(draft: BandaDraft) {
@@ -33,11 +35,17 @@ export function draftId(draft: BandaDraft) {
 	return `${stamp}-${slug}`;
 }
 
-export function formatPreview(draft: BandaDraft): string {
+export function formatPreview(draft: BandaDraft, imageCount = 0): string {
 	const generos = draft.generos.length ? draft.generos.join(' · ') : '(sem gêneros)';
 	const periodo = draft.encerramento
 		? `${draft.formacao}–${draft.encerramento}`
 		: `${draft.formacao}–hoje`;
+	const fotos =
+		imageCount <= 0
+			? 'Nenhuma foto anexada'
+			: imageCount === 1
+				? '1 foto no relatório'
+				: `${imageCount} fotos no relatório`;
 	return [
 		'## Prévia para aprovação',
 		'',
@@ -45,12 +53,13 @@ export function formatPreview(draft: BandaDraft): string {
 		`Formação: ${periodo}`,
 		`Gêneros: ${generos}`,
 		`Autor: ${draft.autor}`,
+		`Fotos: ${fotos}`,
 		'',
 		`> ${draft.resumo}`,
 		'',
 		'### Artigo',
 		draft.artigo.slice(0, 600) + (draft.artigo.length > 600 ? '…' : ''),
 		'',
-		'Responda **sim** para publicar no acervo, ou envie correções em texto.',
+		'Responda **sim** para publicar no acervo, ou envie correções / mais imagens.',
 	].join('\n');
 }

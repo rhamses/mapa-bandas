@@ -34,26 +34,33 @@ export default (Alpine: Alpine) => {
 		messages: [] as AgentMsg[],
 		input: '',
 		loading: false,
-		imageBase64: '' as string,
-		imageMime: '' as string,
-		imageName: '' as string,
+		images: [] as Array<{ base64: string; mime: string; name: string }>,
 
 		async send() {
 			const text = this.input.trim();
-			if (this.loading || (!text && !this.imageBase64)) return;
+			if (this.loading || (!text && this.images.length === 0)) return;
 
+			const attachLabel =
+				this.images.length === 0
+					? ''
+					: this.images.length === 1
+						? `📎 ${this.images[0]!.name}`
+						: `📎 ${this.images.length} imagens`;
 			this.messages.push({
 				role: 'user',
-				content: text || `📎 ${this.imageName || 'imagem'}`,
+				content: [text, attachLabel].filter(Boolean).join('\n') || attachLabel,
 			});
 			this.input = '';
 			this.loading = true;
 			this.$nextTick(() => this.scroll());
 
-			const payload: Record<string, string> = { message: text };
-			if (this.imageBase64) {
-				payload.image_base64 = this.imageBase64;
-				payload.image_mime = this.imageMime || 'image/jpeg';
+			const payload: Record<string, unknown> = { message: text };
+			if (this.images.length) {
+				payload.images = this.images.map((img) => ({
+					base64: img.base64,
+					mime: img.mime,
+					filename: img.name,
+				}));
 			}
 
 			try {
@@ -65,7 +72,7 @@ export default (Alpine: Alpine) => {
 				const data = await res.json();
 				if (!res.ok) throw new Error(data.error || 'Falha no agente');
 				this.messages.push({ role: 'assistant', content: data.reply || '(sem resposta)' });
-				this.clearImage();
+				this.clearImages();
 			} catch (error) {
 				this.messages.push({
 					role: 'assistant',
@@ -79,29 +86,50 @@ export default (Alpine: Alpine) => {
 
 		onFile(event: Event) {
 			const input = event.target as HTMLInputElement;
-			const file = input.files?.[0];
-			if (!file) return;
-			if (file.size > 5 * 1024 * 1024) {
-				this.messages.push({ role: 'assistant', content: 'A imagem pode ter no máximo 5 MB.' });
-				input.value = '';
+			const files = [...(input.files ?? [])];
+			input.value = '';
+			if (!files.length) return;
+
+			const max = 8;
+			const remaining = max - this.images.length;
+			if (remaining <= 0) {
+				this.messages.push({
+					role: 'assistant',
+					content: `Você já anexou ${max} imagens (máximo por relatório).`,
+				});
 				return;
 			}
-			const reader = new FileReader();
-			reader.onload = () => {
-				const result = String(reader.result || '');
-				const match = /^data:([^;]+);base64,(.+)$/.exec(result);
-				if (!match) return;
-				this.imageMime = match[1]!;
-				this.imageBase64 = match[2]!;
-				this.imageName = file.name;
-			};
-			reader.readAsDataURL(file);
+
+			for (const file of files.slice(0, remaining)) {
+				if (file.size > 5 * 1024 * 1024) {
+					this.messages.push({
+						role: 'assistant',
+						content: `"${file.name}" passa de 5 MB e foi ignorada.`,
+					});
+					continue;
+				}
+				const reader = new FileReader();
+				reader.onload = () => {
+					const result = String(reader.result || '');
+					const match = /^data:([^;]+);base64,(.+)$/.exec(result);
+					if (!match) return;
+					if (this.images.length >= max) return;
+					this.images.push({
+						mime: match[1]!,
+						base64: match[2]!,
+						name: file.name,
+					});
+				};
+				reader.readAsDataURL(file);
+			}
 		},
 
-		clearImage() {
-			this.imageBase64 = '';
-			this.imageMime = '';
-			this.imageName = '';
+		removeImage(index: number) {
+			this.images.splice(index, 1);
+		},
+
+		clearImages() {
+			this.images = [];
 		},
 
 		scroll() {
