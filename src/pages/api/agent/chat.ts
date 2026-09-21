@@ -154,7 +154,7 @@ export async function POST({ request }: { request: Request }) {
 		session.pendingDraft &&
 		message &&
 		incomingImages.length === 0 &&
-		message.length < 400 &&
+		message.length < 800 &&
 		!isConfirmation(message)
 	) {
 		const merged = await enrichCoords(
@@ -243,18 +243,30 @@ export async function POST({ request }: { request: Request }) {
 
 function parseCorrecoes(text: string, current: Record<string, unknown>) {
 	const out: Record<string, unknown> = {};
-	const cidade = /cidade\s*[:=]\s*(.+)$/im.exec(text);
+	const nextField =
+		'(?=\\s*;?\\s*(?:cidade|uf|nome|forma(?:cao|ção)?|autor|e-?mail|lat(?:itude)?|lng|longitude|resumo|artigo)\\s*[:=]|\\s*$)';
+	const fieldValue = (label: string) =>
+		new RegExp(`${label}\\s*[:=]\\s*([^\\n]+?)${nextField}`, 'im').exec(text);
+
+	const cidade = fieldValue('cidade');
 	const uf = /\buf\s*[:=]\s*([A-Za-z]{2})\b/im.exec(text);
-	const nome = /nome\s*[:=]\s*(.+)$/im.exec(text);
+	const nome = fieldValue('nome');
 	const formacao = /forma(?:cao|ção)?\s*[:=]\s*(\d{4})/im.exec(text);
-	const autor = /autor\s*[:=]\s*(.+)$/im.exec(text);
+	const autor = fieldValue('autor');
 	const email = /e-?mail\s*[:=]\s*(\S+)/im.exec(text);
+	const lat = /\blat(?:itude)?\s*[:=]\s*(-?\d+(?:\.\d+)?)/im.exec(text);
+	const lng = /\b(?:lng|longitude)\s*[:=]\s*(-?\d+(?:\.\d+)?)/im.exec(text);
+	const resumo = fieldValue('resumo');
+
 	if (cidade) out.cidade = cidade[1]!.trim();
 	if (uf) out.uf = uf[1]!.toUpperCase();
 	if (nome) out.nome = nome[1]!.trim();
 	if (formacao) out.formacao = Number(formacao[1]);
 	if (autor) out.autor = autor[1]!.trim();
 	if (email) out.email = email[1]!.trim();
+	if (lat) out.lat = Number(lat[1]);
+	if (lng) out.lng = Number(lng[1]);
+	if (resumo) out.resumo = resumo[1]!.trim();
 
 	const artigo = /artigo\s*[:=]\s*([\s\S]+)/im.exec(text);
 	if (artigo && artigo[1]!.trim().length >= 80) out.artigo = artigo[1]!.trim();
