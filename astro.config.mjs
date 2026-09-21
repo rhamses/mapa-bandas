@@ -39,6 +39,7 @@ export default defineConfig({
 					'book-open',
 					'image',
 					'image-plus',
+					'bot',
 					'trash-2',
 				],
 			},
@@ -47,7 +48,8 @@ export default defineConfig({
 			filter: (page) =>
 				!page.includes('/api/') &&
 				!page.includes('/partials/') &&
-				!page.includes('/admin'),
+				!page.includes('/admin') &&
+				!page.includes('/agent'),
 		}),
 	],
 	vite: {

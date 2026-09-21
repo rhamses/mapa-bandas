@@ -21,3 +21,11 @@ declare namespace App {
 		};
 	}
 }
+
+interface AiBinding {
+	run(model: string, inputs: Record<string, unknown>): Promise<unknown>;
+}
+
+interface Env {
+	AI?: AiBinding;
+}
