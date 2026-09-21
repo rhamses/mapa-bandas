@@ -60,7 +60,7 @@ export function extractHeuristic(text: string): BandaDraftPartial {
 	const out: BandaDraftPartial = { autor: 'Agente MCP' };
 
 	const nomeMatch =
-		/(?:banda|grupo)\s+["“]?([A-Za-zÀ-ÿ0-9 .'\-]{2,50}?)(?=\s*,|\s+de\s+[A-ZÀ-Ÿ]|\s+em\s+[A-ZÀ-Ÿ]|\s+formad|\s+faz\b|[.!?])/i.exec(
+		/(?:banda|grupo)\s+["“]?([A-Za-zÀ-ÿ0-9 .'\-]{2,50}?)(?=\s*,|\s+de\s+[A-ZÀ-Ÿ]|\s+em\s+[A-ZÀ-Ÿ]|\s+formad|\s+nasceu|\s+faz\b|[.!?])/i.exec(
 			joined,
 		) || /^([A-Za-zÀ-ÿ0-9 .'\-]{2,60})$/m.exec(lines[0] ?? '');
 	if (nomeMatch) out.nome = nomeMatch[1]!.trim();
@@ -75,8 +75,24 @@ export function extractHeuristic(text: string): BandaDraftPartial {
 		if (isValidUf(uf)) out.uf = uf;
 	}
 
-	for (const [nome, sigla] of UF_BY_NAME) {
-		if (joined.toLowerCase().includes(nome) && !out.uf) out.uf = sigla;
+	// "em Curitiba, Paraná" / "de Porto Alegre (Rio Grande do Sul)"
+	if (!out.cidade || !out.uf) {
+		for (const [nomeUf, sigla] of [...UF_BY_NAME.entries()].sort(
+			(a, b) => b[0].length - a[0].length,
+		)) {
+			const escaped = nomeUf.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+			const re = new RegExp(
+				`(?:de|em|na|no)\\s+([A-Za-zÀ-ÿ .'\\-]+?)\\s*[,/(-]\\s*${escaped}(?=[\\s.,;:!?)]|$)`,
+				'i',
+			);
+			const m = re.exec(joined);
+			if (m) {
+				if (!out.cidade) out.cidade = m[1]!.trim();
+				if (!out.uf) out.uf = sigla;
+				break;
+			}
+			if (!out.uf && joined.toLowerCase().includes(nomeUf)) out.uf = sigla;
+		}
 	}
 
 	const ano =
